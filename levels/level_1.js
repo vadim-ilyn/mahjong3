@@ -4,7 +4,7 @@
   if (!window.MAHJONG_LEVELS) window.MAHJONG_LEVELS = {};
   window.MAHJONG_LEVELS['level-1'] = {
     "levelId": "level-1",
-    "slotsAmount": 8,
+    "slotsAmount": 7,
     "movesCount": 150,
     "stock": [
       "Vows",
