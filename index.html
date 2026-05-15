@@ -296,14 +296,26 @@
     /* Hide Load-level / Restart on mobile to reclaim topbar space; players
        can still restart via the end-of-game popup. */
     .topbar-right { display: none; }
-    #stockBar { padding: 10px 8px; gap: 8px; }
-    #stockBar .actions-col { margin-right: 0; gap: 6px; }
+    /* Stock panel: ~15% shorter on mobile. Achieved by trimming vertical
+       padding, scaling the stock-pile tiles to 0.85, and shrinking the
+       action buttons so they no longer dominate the panel height. */
+    #stockBar { padding: 6px 8px; gap: 8px; }
+    #stockBar .actions-col { margin-right: 0; gap: 4px; }
     .actions-col button {
-      padding: 8px 12px; min-width: 0; font-size: 13px;
+      padding: 5px 10px; min-width: 0; font-size: 12px;
     }
-    .pile-wrap { width: calc(var(--tile-w) + 18px); }
-    .pile-wrap .behind-1 { transform: translate(6px, 2px); }
-    .pile-wrap .behind-2 { transform: translate(12px, 4px); }
+    #stockBar .tile, #stockBar .pile-empty {
+      width: calc(var(--tile-w) * 0.85);
+      height: calc(var(--tile-h) * 0.85);
+    }
+    .pile-wrap {
+      width: calc(var(--tile-w) * 0.85 + 16px);
+      height: calc(var(--tile-h) * 0.85);
+    }
+    .pile-col { gap: 4px; }
+    .pile-count { font-size: 11px; min-height: 11px; }
+    .pile-wrap .behind-1 { transform: translate(5px, 2px); }
+    .pile-wrap .behind-2 { transform: translate(10px, 4px); }
     /* Force all slots onto one row on mobile by giving each slot-cell an
        equal flex share of the bar width. Slot + inner tile then scale to
        that share, preserving the 4:6 aspect ratio. */
