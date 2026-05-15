@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020617">
 <title>Mahjong — Game</title>
 <style>
   :root {
@@ -24,7 +26,10 @@
     color: var(--ink); background: var(--bg);
     display: flex; flex-direction: column;
     min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior: none;
   }
+  button, label, .tile, .slot, .pile-empty.recycle { touch-action: manipulation; }
 
   header.topbar {
     display: grid;
@@ -104,8 +109,16 @@
   .tile.face-down { background-image: url('assets/card-back.png'); background-color: #1e3a8a; color: transparent; }
   .tile.draggable { cursor: grab; }
   .tile.draggable:active { cursor: grabbing; }
-  .tile.draggable:hover { transform: translateY(-3px); box-shadow: 0 6px 14px rgba(0,0,0,0.5); }
+  @media (hover: hover) {
+    .tile.draggable:hover { transform: translateY(-3px); box-shadow: 0 6px 14px rgba(0,0,0,0.5); }
+  }
   .tile.dragging { opacity: 0.35; }
+  .tile.drag-ghost {
+    position: fixed; pointer-events: none;
+    opacity: 0.9; z-index: 99998;
+    transition: none;
+    transform: scale(1.05);
+  }
 
   .tile .word {
     font-size: 12px; line-height: 1.15; word-break: break-word;
@@ -264,6 +277,46 @@
     font: inherit; font-size: 16px; font-weight: 600;
   }
   .popup-content button:hover { background: #0ea5e9; }
+
+  /* Mobile layout: smaller cells & tiles, stacked topbar, tighter padding,
+     no oversized actions-col margin. */
+  @media (max-width: 720px) {
+    :root { --cell: 12px; --tile-w: 48px; --tile-h: 72px; }
+    header.topbar {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 6px; padding: 8px 12px;
+    }
+    header.topbar h1 { font-size: 16px; }
+    .meta {
+      grid-column: 1 / -1; justify-self: start;
+      font-size: 12px; gap: 8px;
+      flex-wrap: wrap; white-space: normal;
+    }
+    .topbar-right { gap: 6px; }
+    header.topbar button, header.topbar label {
+      font-size: 13px; padding: 6px 10px;
+    }
+    #stockBar { padding: 10px 8px; gap: 8px; }
+    #stockBar .actions-col { margin-right: 0; gap: 6px; }
+    .actions-col button {
+      padding: 8px 12px; min-width: 0; font-size: 13px;
+    }
+    .pile-wrap { width: calc(var(--tile-w) + 18px); }
+    .pile-wrap .behind-1 { transform: translate(6px, 2px); }
+    .pile-wrap .behind-2 { transform: translate(12px, 4px); }
+    #slotsBar { padding: 8px 6px; gap: 6px; }
+    .slot-category { font-size: 10px; }
+    .slot-counter { font-size: 11px; }
+    .tile .word { font-size: 10px; line-height: 1.1; }
+    .tile .count { font-size: 12px; bottom: 6px; }
+    .tile .joker { width: 14px; height: 14px; top: 2px; right: 2px; }
+    #boardWrap { padding: 10px; }
+    #toast {
+      left: 12px; right: 12px; bottom: 12px;
+      transform: none; font-size: 13px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -314,7 +367,12 @@
 <script>
 'use strict';
 
-const CELL = 16;
+const DEFAULT_CELL = 16;
+function getCell() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--cell');
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_CELL;
+}
 const TILE_W = 4;
 const TILE_H = 6;
 
@@ -516,6 +574,34 @@ function setupTileDrag(node, tile) {
       s.classList.remove('drag-over', 'drag-over-bad')
     );
   });
+  // Touch drag: HTML5 drag events never fire on touchscreens, so synthesize
+  // an equivalent by tracking a finger-following ghost and hit-testing slots
+  // on each move. Global touchmove/touchend handlers (below) do the rest.
+  node.addEventListener('touchstart', (e) => {
+    if (touchDrag) return;
+    const t = e.changedTouches[0];
+    const rect = node.getBoundingClientRect();
+    const ghost = node.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    // Override inline styles inherited from board tiles (position/z/shadow).
+    ghost.style.position = 'fixed';
+    ghost.style.left = rect.left + 'px';
+    ghost.style.top = rect.top + 'px';
+    ghost.style.width = rect.width + 'px';
+    ghost.style.height = rect.height + 'px';
+    ghost.style.zIndex = '99998';
+    ghost.style.boxShadow = '0 10px 24px rgba(0,0,0,0.55)';
+    document.body.appendChild(ghost);
+    touchDrag = {
+      tile, node, ghost,
+      offsetX: t.clientX - rect.left,
+      offsetY: t.clientY - rect.top,
+      lastSlot: null,
+    };
+    node.classList.add('dragging');
+    game.dragSource = { id: tile.id, loc: tile.loc };
+    e.preventDefault();
+  }, { passive: false });
 }
 
 function findTile(ref) {
@@ -625,9 +711,10 @@ function renderHeader() {
 
 function renderBoard() {
   const board = el('board');
+  const cell = getCell();
   const { cols, rows } = game.bounds;
-  board.style.width  = (cols * CELL) + 'px';
-  board.style.height = (rows * CELL) + 'px';
+  board.style.width  = (cols * cell) + 'px';
+  board.style.height = (rows * cell) + 'px';
   board.innerHTML = '';
   const sorted = game.boardTiles.slice().sort((a, b) => a.z - b.z);
   for (const tile of sorted) {
@@ -635,8 +722,8 @@ function renderBoard() {
     const blocked = isBlocked(tile);
     const node = makeTileElement(tile, { faceUp: !blocked });
     node.style.position = 'absolute';
-    node.style.left = (tile.x * CELL) + 'px';
-    node.style.top  = (tile.y * CELL) + 'px';
+    node.style.left = (tile.x * cell) + 'px';
+    node.style.top  = (tile.y * cell) + 'px';
     // +z so higher-stage tiles paint above. Add a small per-tile bump on hover
     // via the .draggable:hover rule.
     node.style.zIndex = String(100 + tile.z);
@@ -950,6 +1037,63 @@ el('shuffleBtn').addEventListener('click', () => {
   shuffleBoardTiles();
 });
 el('undoBtn').addEventListener('click', undo);
+
+// Touch-drag state and global handlers. setupTileDrag wires touchstart on
+// each tile; movement and release have to be on document so the gesture
+// survives the finger leaving the original element.
+let touchDrag = null;
+function endTouchDrag(applySlot) {
+  const s = touchDrag;
+  if (!s) return;
+  if (s.lastSlot) s.lastSlot.classList.remove('drag-over', 'drag-over-bad');
+  s.node.classList.remove('dragging');
+  s.ghost.remove();
+  const tile = s.tile;
+  game.dragSource = null;
+  touchDrag = null;
+  if (applySlot != null && canAcceptDrop(applySlot, tile)) applyDrop(applySlot, tile);
+}
+document.addEventListener('touchmove', (e) => {
+  if (!touchDrag) return;
+  const t = e.changedTouches[0];
+  const s = touchDrag;
+  s.ghost.style.left = (t.clientX - s.offsetX) + 'px';
+  s.ghost.style.top = (t.clientY - s.offsetY) + 'px';
+  s.ghost.style.display = 'none';
+  const under = document.elementFromPoint(t.clientX, t.clientY);
+  s.ghost.style.display = '';
+  const slotEl = under && under.closest ? under.closest('.slot') : null;
+  if (s.lastSlot && s.lastSlot !== slotEl) {
+    s.lastSlot.classList.remove('drag-over', 'drag-over-bad');
+  }
+  s.lastSlot = slotEl;
+  if (slotEl) {
+    const idx = +slotEl.dataset.slotIdx;
+    const ok = canAcceptDrop(idx, s.tile);
+    slotEl.classList.toggle('drag-over', ok);
+    slotEl.classList.toggle('drag-over-bad', !ok);
+  }
+  e.preventDefault();
+}, { passive: false });
+document.addEventListener('touchend', (e) => {
+  if (!touchDrag) return;
+  const t = e.changedTouches[0];
+  touchDrag.ghost.style.display = 'none';
+  const under = document.elementFromPoint(t.clientX, t.clientY);
+  const slotEl = under && under.closest ? under.closest('.slot') : null;
+  endTouchDrag(slotEl ? +slotEl.dataset.slotIdx : null);
+});
+document.addEventListener('touchcancel', () => endTouchDrag(null));
+
+// Cell size is driven by a CSS variable that changes at the mobile
+// breakpoint, so the board needs a re-layout on resize/orientation change.
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (!game) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 120);
+});
+window.addEventListener('orientationchange', () => { if (game) render(); });
 
 el('loadJson').addEventListener('change', async (e) => {
   const file = e.target.files[0];
