@@ -304,9 +304,22 @@
     .pile-wrap { width: calc(var(--tile-w) + 18px); }
     .pile-wrap .behind-1 { transform: translate(6px, 2px); }
     .pile-wrap .behind-2 { transform: translate(12px, 4px); }
-    #slotsBar { padding: 8px 6px; gap: 6px; }
-    .slot-category { font-size: 10px; }
-    .slot-counter { font-size: 11px; }
+    /* Force all slots onto one row on mobile by giving each slot-cell an
+       equal flex share of the bar width. Slot + inner tile then scale to
+       that share, preserving the 4:6 aspect ratio. */
+    #slotsBar {
+      padding: 8px 6px; gap: 4px;
+      flex-wrap: nowrap; align-items: flex-start;
+    }
+    .slot-cell { flex: 1 1 0; min-width: 0; width: auto; }
+    .slot { width: 100%; height: auto; aspect-ratio: 4 / 6; }
+    .slot.has-tile .tile { width: 100%; height: 100%; }
+    .slot-category { font-size: 9px; max-width: 100%; }
+    .slot-counter { font-size: 10px; }
+    .slot.has-tile .tile .word { font-size: 9px; line-height: 1.1; }
+    .slot.has-tile .tile .count { font-size: 10px; bottom: 4px; }
+    .slot.has-tile .tile .joker { width: 12px; height: 12px; top: 2px; right: 2px; }
+    .slot.has-stack::before { transform: translate(2px, 2px); }
     .tile .word { font-size: 10px; line-height: 1.1; }
     .tile .count { font-size: 12px; bottom: 6px; }
     .tile .joker { width: 14px; height: 14px; top: 2px; right: 2px; }
