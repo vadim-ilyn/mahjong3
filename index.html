@@ -283,7 +283,7 @@
   @media (max-width: 720px) {
     :root { --cell: 12px; --tile-w: 48px; --tile-h: 72px; }
     header.topbar {
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       grid-template-rows: auto auto;
       gap: 6px; padding: 8px 12px;
     }
@@ -293,10 +293,9 @@
       font-size: 12px; gap: 8px;
       flex-wrap: wrap; white-space: normal;
     }
-    .topbar-right { gap: 6px; }
-    header.topbar button, header.topbar label {
-      font-size: 13px; padding: 6px 10px;
-    }
+    /* Hide Load-level / Restart on mobile to reclaim topbar space; players
+       can still restart via the end-of-game popup. */
+    .topbar-right { display: none; }
     #stockBar { padding: 10px 8px; gap: 8px; }
     #stockBar .actions-col { margin-right: 0; gap: 6px; }
     .actions-col button {
