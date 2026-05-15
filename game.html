@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mahjong — Game</title>
+<style>
+  :root {
+    --cell: 16px;
+    --tile-w: 64px;
+    --tile-h: 96px;
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --line: #334155;
+    --ink: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --ok: #22c55e;
+    --bad: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); background: var(--bg);
+    display: flex; flex-direction: column;
+    min-height: 100vh;
+  }
+
+  header.topbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px; align-items: center;
+    padding: 10px 16px; background: #020617; border-bottom: 1px solid var(--line);
+  }
+  header.topbar h1 { margin: 0; font-size: 20px; font-weight: 600; justify-self: start; }
+  .meta {
+    justify-self: center;
+    color: var(--muted); font-size: 16px;
+    display: flex; gap: 16px; align-items: center;
+    white-space: nowrap;
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .topbar-right {
+    justify-self: end;
+    display: flex; gap: 12px; align-items: center;
+  }
+  header.topbar button, header.topbar label {
+    background: var(--accent); color: #0f172a; border: 0;
+    padding: 8px 14px; border-radius: 4px; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 600;
+  }
+  header.topbar button:hover { background: #0ea5e9; }
+  header.topbar input[type="file"] { display: none; }
+
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  #boardWrap {
+    flex: 1; overflow: auto; padding: 20px;
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  #board {
+    position: relative;
+    background:
+      linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px) 0 0 / var(--cell) var(--cell),
+      linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px) 0 0 / var(--cell) var(--cell),
+      #1e293b;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+  }
+
+  /* A tile is a fixed-size card. Positioning is applied by the caller — the
+     base class stays free of position so it works in flow (slots) and absolute
+     (board, stock). */
+  .tile {
+    position: relative;
+    width: var(--tile-w); height: var(--tile-h);
+    border-radius: 6px;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    user-select: none;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 4px;
+    color: #0f172a; font-weight: 600; text-align: center;
+    overflow: hidden;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .tile.face-up { background-image: url('assets/card-front.png'); background-color: #fff8e1; }
+  .tile.category::after {
+    content: '';
+    position: absolute;
+    left: 10%; right: 10%; bottom: 2px;
+    height: 2px; border-radius: 1px;
+    background: #f97316;
+  }
+  .tile .joker {
+    position: absolute;
+    top: 3px; right: 3px;
+    width: 18px; height: 18px;
+    background: url('assets/joker.png') center / contain no-repeat;
+    pointer-events: none;
+  }
+  .tile.face-down { background-image: url('assets/card-back.png'); background-color: #1e3a8a; color: transparent; }
+  .tile.draggable { cursor: grab; }
+  .tile.draggable:active { cursor: grabbing; }
+  .tile.draggable:hover { transform: translateY(-3px); box-shadow: 0 6px 14px rgba(0,0,0,0.5); }
+  .tile.dragging { opacity: 0.35; }
+
+  .tile .word {
+    font-size: 12px; line-height: 1.15; word-break: break-word;
+  }
+  .tile .tile-image {
+    width: 80%; height: 80%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+  }
+  .tile .count {
+    position: absolute;
+    left: 50%; bottom: 8px; transform: translateX(-50%);
+    font-size: 14px; font-weight: 600;
+    color: #0f172a; line-height: 1;
+  }
+  .tile .count.full { color: var(--ok); }
+
+  #slotsBar {
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 14px 16px;
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+  }
+  .slot-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .slot {
+    position: relative;
+    width: var(--tile-w); height: var(--tile-h);
+    border: 2px dashed #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    transition: border-color 0.08s ease, box-shadow 0.08s ease;
+  }
+  .slot.has-tile { border-style: solid; border-color: transparent; background: transparent; padding: 0; }
+  /* Stack peek: a faint card sliver poking out from behind the top tile. */
+  .slot.has-stack::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: #fff8e1;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+    transform: translate(3px, 3px);
+    z-index: 0;
+  }
+  .slot.has-tile .tile { position: relative; z-index: 1; }
+  .slot.drag-over { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(34,197,94,0.4); }
+  .slot.drag-over-bad { border-color: var(--bad); box-shadow: 0 0 0 2px rgba(239,68,68,0.4); }
+  .slot-category {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    min-height: 13px;
+    max-width: calc(var(--tile-w) + 12px);
+    text-align: center; line-height: 1.15;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .slot-counter {
+    font-size: 13px; font-weight: 600;
+    min-height: 13px;
+    color: var(--ink); line-height: 1;
+  }
+  .slot-counter.full { color: var(--ok); }
+
+  #stockBar {
+    background: #020617; border-bottom: 1px solid var(--line);
+    padding: 14px 16px;
+    display: flex; gap: 14px; justify-content: center; align-items: center;
+  }
+  .pile-wrap {
+    position: relative;
+    width: calc(var(--tile-w) + 24px);
+    height: var(--tile-h);
+  }
+  .pile-wrap .tile { position: absolute; left: 0; top: 0; }
+  .pile-wrap .behind-1 { transform: translate(8px, 3px); opacity: 0.75; z-index: 1; }
+  .pile-wrap .behind-2 { transform: translate(16px, 6px); opacity: 0.45; z-index: 0; }
+  .pile-wrap .active { z-index: 2; }
+  #stockPileWrap .active { cursor: pointer; }
+  .pile-col {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .pile-count {
+    font-size: 13px; font-weight: 600;
+    color: var(--ink); min-height: 14px; line-height: 1;
+  }
+  .pile-empty {
+    color: var(--muted); font-size: 11px;
+    width: var(--tile-w); height: var(--tile-h);
+    display: flex; align-items: center; justify-content: center;
+    border: 2px dashed #334155; border-radius: 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .pile-empty.recycle {
+    cursor: pointer;
+    color: var(--accent); border-color: var(--accent);
+    font-size: 28px; line-height: 1;
+  }
+  .pile-empty.recycle:hover { background: rgba(56, 189, 248, 0.08); }
+
+  .actions-col {
+    display: flex; flex-direction: column; gap: 8px;
+    align-self: center;
+  }
+  #stockBar .actions-col { margin-right: 200px; }
+  .actions-col button {
+    background: var(--accent); color: #0f172a; border: 0;
+    padding: 10px 18px; border-radius: 6px; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 600;
+    min-width: 100px;
+  }
+  .actions-col button:hover:not(:disabled) { background: #0ea5e9; }
+  .actions-col button:disabled {
+    background: #334155; color: var(--muted); cursor: not-allowed;
+  }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #020617; color: #f1f5f9;
+    padding: 12px 20px; border-radius: 8px;
+    border: 1px solid var(--line);
+    font-size: 14px; font-weight: 600;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    opacity: 0; transition: opacity 0.18s ease;
+    pointer-events: none;
+    z-index: 99999;
+  }
+  #toast.show { opacity: 1; }
+  #toast.win { color: #bbf7d0; border-color: var(--ok); }
+  #toast.lose { color: #fecaca; border-color: var(--bad); }
+
+  #endPopup {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100000;
+  }
+  #endPopup[hidden] { display: none; }
+  .popup-content {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 28px 40px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    max-width: 320px;
+  }
+  .popup-content h2 { margin: 0 0 8px; font-size: 22px; color: var(--ink); }
+  .popup-content p { margin: 0 0 22px; color: var(--muted); font-size: 15px; }
+  .popup-content button {
+    background: var(--accent); color: #0f172a; border: 0;
+    padding: 12px 28px; border-radius: 6px; cursor: pointer;
+    font: inherit; font-size: 16px; font-weight: 600;
+  }
+  .popup-content button:hover { background: #0ea5e9; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Mahjong</h1>
+    <div class="meta" id="levelMeta"></div>
+    <div class="topbar-right">
+      <label for="loadJson" title="Load a different level JSON">Load level…</label>
+      <input type="file" id="loadJson" accept=".json,application/json">
+      <button id="resetBtn">Restart</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="stockBar">
+      <div class="actions-col">
+        <button id="shuffleBtn" title="Shuffle remaining board tiles (costs 1 move)">Shuffle</button>
+        <button id="undoBtn" title="Undo the last move">Undo</button>
+      </div>
+      <div class="pile-col">
+        <div id="wastePileWrap" class="pile-wrap"></div>
+        <div class="pile-count" id="wasteCount">0</div>
+      </div>
+      <div class="pile-col">
+        <div id="stockPileWrap" class="pile-wrap"></div>
+        <div class="pile-count" id="stockDeckCount">0</div>
+      </div>
+    </div>
+    <div id="slotsBar"></div>
+    <div id="boardWrap">
+      <div id="board"></div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <div id="endPopup" hidden>
+    <div class="popup-content">
+      <h2 id="popupTitle">Game over</h2>
+      <p id="popupMessage"></p>
+      <button id="popupRestart">Restart</button>
+    </div>
+  </div>
+
+  <!-- Sidecar level for file:// (where fetch is blocked). HTTP loads still prefer
+       fetching levels/level_1.json directly so editor edits show up immediately. -->
+  <script src="levels/level_1.js"></script>
+<script>
+'use strict';
+
+const CELL = 16;
+const TILE_W = 4;
+const TILE_H = 6;
+
+const el = (id) => document.getElementById(id);
+
+let game = null;
+
+function rectsOverlap(a, b) {
+  return !(a.x + TILE_W <= b.x || b.x + TILE_W <= a.x ||
+           a.y + TILE_H <= b.y || b.y + TILE_H <= a.y);
+}
+
+function isBlocked(tile) {
+  if (tile.collected) return false;
+  for (const other of game.boardTiles) {
+    if (other === tile || other.collected) continue;
+    if (other.z <= tile.z) continue;
+    if (rectsOverlap(other, tile)) return true;
+  }
+  return false;
+}
+
+function slotForCategory(catId) {
+  for (const s of game.slots) {
+    if (s.categoryTile && s.categoryTile.categoryId === catId) return s;
+  }
+  return null;
+}
+
+function collectedCount(catId) {
+  const s = slotForCategory(catId);
+  return s ? s.count : 0;
+}
+
+function totalForCategory(catId) {
+  return game.totalsPerCategory.get(catId) || 0;
+}
+
+function initGame(level) {
+  hideEndPopup();
+  // Build category-name lookups so stock entries (which are plain strings)
+  // can be mapped back to their categoryId. A stock string whose value matches
+  // a categoryId IS the category tile for that category.
+  const categoryIds = new Set();
+  const wordToCategory = new Map();
+  const iconCategories = new Set();
+  for (const c of (level.categories || [])) {
+    categoryIds.add(c.categoryId);
+    if (c.icon === true) iconCategories.add(c.categoryId);
+    for (const w of (c.wordsIds || [])) wordToCategory.set(w, c.categoryId);
+  }
+  const inferCategoryId = (name) =>
+    categoryIds.has(name) ? name : (wordToCategory.get(name) || null);
+
+  let nextId = 0;
+  const boardTiles = [];
+  for (const stage of (level.stages || [])) {
+    const z = Number.isFinite(stage.z) ? stage.z : 0;
+    for (const t of (stage.tiles || [])) {
+      boardTiles.push({
+        id: 'b' + (nextId++),
+        loc: 'board',
+        x: t.x | 0, y: t.y | 0, z,
+        categoryId: String(t.categoryId ?? ''),
+        wordId: String(t.wordId ?? ''),
+        isCategory: String(t.wordId ?? '') === String(t.categoryId ?? ''),
+        collected: false,
+      });
+    }
+  }
+
+  const stockDeck = [];
+  for (const s of (level.stock || [])) {
+    const word = String(s);
+    const catId = inferCategoryId(word);
+    if (!catId) { console.warn('Stock entry has no known category:', word); continue; }
+    stockDeck.push({
+      id: 'k' + (nextId++),
+      loc: 'stock',
+      categoryId: catId,
+      wordId: word,
+      isCategory: word === catId,
+      collected: false,
+    });
+  }
+  const wastePile = [];
+
+  const slots = [];
+  const slotsAmount = Math.max(0, level.slotsAmount | 0) || 6;
+  for (let i = 0; i < slotsAmount; i++) {
+    slots.push({ idx: i, categoryTile: null, topTile: null, count: 0 });
+  }
+
+  // Totals exclude the category tile itself — the displayed count is "how many
+  // of this category's word tiles have been collected", not "tiles in slot".
+  const totalsPerCategory = new Map();
+  const bump = (catId) => totalsPerCategory.set(catId, (totalsPerCategory.get(catId) || 0) + 1);
+  for (const t of boardTiles) if (!t.isCategory) bump(t.categoryId);
+  for (const t of stockDeck)  if (!t.isCategory) bump(t.categoryId);
+
+  // Size the board to the actual tile footprint (+padding) rather than the
+  // grid declared in JSON, which can be much larger than the content.
+  let maxX = TILE_W, maxY = TILE_H, minX = Infinity, minY = Infinity;
+  for (const t of boardTiles) {
+    if (t.x < minX) minX = t.x;
+    if (t.y < minY) minY = t.y;
+    if (t.x + TILE_W > maxX) maxX = t.x + TILE_W;
+    if (t.y + TILE_H > maxY) maxY = t.y + TILE_H;
+  }
+  if (!isFinite(minX)) { minX = 0; minY = 0; }
+  // Shift everything so the layout starts near (1,1) — keeps the board
+  // a sensible size regardless of where tiles were laid out in the editor.
+  const shiftX = Math.max(0, minX - 1);
+  const shiftY = Math.max(0, minY - 1);
+  for (const t of boardTiles) { t.x -= shiftX; t.y -= shiftY; }
+  const cols = (maxX - shiftX) + 1;
+  const rows = (maxY - shiftY) + 1;
+
+  game = {
+    level,
+    boardTiles,
+    stockDeck,
+    wastePile,
+    slots,
+    movesLeft: level.movesCount | 0,
+    movesStart: level.movesCount | 0,
+    totalsPerCategory,
+    iconCategories,
+    bounds: { cols, rows },
+    dragSource: null,
+    history: [],
+  };
+
+  render();
+}
+
+function makeTileElement(tile, opts) {
+  opts = opts || {};
+  const d = document.createElement('div');
+  d.className = 'tile';
+  d.dataset.tileId = tile.id;
+  d.dataset.tileLoc = tile.loc;
+  const faceUp = opts.faceUp !== false;
+  d.classList.add(faceUp ? 'face-up' : 'face-down');
+  if (!faceUp) return d;
+
+  const useIcon = game && game.iconCategories &&
+    game.iconCategories.has(tile.categoryId) && !tile.isCategory;
+  if (useIcon) {
+    const img = document.createElement('img');
+    img.className = 'tile-image';
+    img.alt = tile.wordId;
+    img.draggable = false;
+    img.src = 'pictures/' + encodeURIComponent(tile.wordId) + '.png';
+    // If the picture isn't there, fall back to the word text so the tile
+    // still identifies itself.
+    img.addEventListener('error', () => {
+      const w = document.createElement('div');
+      w.className = 'word';
+      w.textContent = tile.wordId;
+      img.replaceWith(w);
+    });
+    d.appendChild(img);
+  } else {
+    const w = document.createElement('div');
+    w.className = 'word';
+    w.textContent = tile.wordId;
+    d.appendChild(w);
+  }
+
+  if (tile.isCategory) {
+    d.classList.add('category');
+    const joker = document.createElement('div');
+    joker.className = 'joker';
+    d.appendChild(joker);
+    const total = totalForCategory(tile.categoryId);
+    const got = collectedCount(tile.categoryId);
+    const c = document.createElement('div');
+    c.className = 'count' + (got >= total && total > 0 ? ' full' : '');
+    c.textContent = got + '/' + total;
+    d.appendChild(c);
+  }
+  return d;
+}
+
+function setupTileDrag(node, tile) {
+  node.classList.add('draggable');
+  node.draggable = true;
+  node.addEventListener('dragstart', (e) => {
+    game.dragSource = { id: tile.id, loc: tile.loc };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tile.id);
+    node.classList.add('dragging');
+  });
+  node.addEventListener('dragend', () => {
+    node.classList.remove('dragging');
+    game.dragSource = null;
+    document.querySelectorAll('.slot').forEach(s =>
+      s.classList.remove('drag-over', 'drag-over-bad')
+    );
+  });
+}
+
+function findTile(ref) {
+  if (!ref) return null;
+  if (ref.loc === 'board') return game.boardTiles.find(t => t.id === ref.id) || null;
+  if (ref.loc === 'stock') return game.stockDeck.find(t => t.id === ref.id) || null;
+  if (ref.loc === 'waste') return game.wastePile.find(t => t.id === ref.id) || null;
+  return null;
+}
+
+function canAcceptDrop(slotIdx, tile) {
+  const slot = game.slots[slotIdx];
+  if (!slot.categoryTile) return tile.isCategory;
+  if (tile.isCategory) return false;
+  return tile.categoryId === slot.categoryTile.categoryId;
+}
+
+function applyDrop(slotIdx, tile) {
+  const slot = game.slots[slotIdx];
+  const prevLoc = tile.loc;
+  const prevSlot = { categoryTile: slot.categoryTile, topTile: slot.topTile, count: slot.count };
+  const prevMoves = game.movesLeft;
+
+  if (tile.loc === 'board') {
+    tile.collected = true;
+  } else if (tile.loc === 'stock') {
+    const i = game.stockDeck.findIndex(t => t.id === tile.id);
+    if (i >= 0) game.stockDeck.splice(i, 1);
+  } else if (tile.loc === 'waste') {
+    const i = game.wastePile.findIndex(t => t.id === tile.id);
+    if (i >= 0) game.wastePile.splice(i, 1);
+  }
+  if (!slot.categoryTile) {
+    slot.categoryTile = tile;
+    slot.count = 0;
+  } else {
+    slot.count += 1;
+  }
+  slot.topTile = tile;
+  tile.loc = 'slot-' + slotIdx;
+  // Auto-clear: once a slot's category is fully collected, vacate it so the
+  // player can use it for a different category.
+  if (slot.categoryTile) {
+    const total = totalForCategory(slot.categoryTile.categoryId);
+    if (total > 0 && slot.count >= total) {
+      slot.categoryTile = null;
+      slot.topTile = null;
+      slot.count = 0;
+    }
+  }
+  game.movesLeft = Math.max(0, game.movesLeft - 1);
+
+  game.history.push(() => {
+    tile.loc = prevLoc;
+    if (prevLoc === 'board') {
+      tile.collected = false;
+    } else if (prevLoc === 'waste') {
+      game.wastePile.push(tile);
+    } else if (prevLoc === 'stock') {
+      game.stockDeck.unshift(tile);
+    }
+    slot.categoryTile = prevSlot.categoryTile;
+    slot.topTile = prevSlot.topTile;
+    slot.count = prevSlot.count;
+    game.movesLeft = prevMoves;
+  });
+
+  render();
+  checkEndState();
+}
+
+function setupSlotDrop(node, slotIdx) {
+  node.addEventListener('dragover', (e) => {
+    const tile = findTile(game.dragSource);
+    if (!tile) return;
+    const ok = canAcceptDrop(slotIdx, tile);
+    e.preventDefault();
+    e.dataTransfer.dropEffect = ok ? 'move' : 'none';
+    node.classList.toggle('drag-over', ok);
+    node.classList.toggle('drag-over-bad', !ok);
+  });
+  node.addEventListener('dragleave', () => {
+    node.classList.remove('drag-over', 'drag-over-bad');
+  });
+  node.addEventListener('drop', (e) => {
+    e.preventDefault();
+    node.classList.remove('drag-over', 'drag-over-bad');
+    const tile = findTile(game.dragSource);
+    if (!tile) return;
+    if (!canAcceptDrop(slotIdx, tile)) return;
+    applyDrop(slotIdx, tile);
+  });
+}
+
+function renderHeader() {
+  const onBoard = game.boardTiles.filter(t => !t.collected).length;
+  const remaining = onBoard + game.stockDeck.length + game.wastePile.length;
+  const filled = game.slots.filter(s => s.categoryTile).length;
+  const meta = el('levelMeta');
+  meta.innerHTML = [
+    game.level.levelId ? `<b>${game.level.levelId}</b>` : '',
+    `moves: <b>${game.movesLeft}</b>/${game.movesStart}`,
+    `tiles left: <b>${remaining}</b>`,
+    `slots: <b>${filled}/${game.slots.length}</b>`,
+  ].filter(Boolean).join(' · ');
+}
+
+function renderBoard() {
+  const board = el('board');
+  const { cols, rows } = game.bounds;
+  board.style.width  = (cols * CELL) + 'px';
+  board.style.height = (rows * CELL) + 'px';
+  board.innerHTML = '';
+  const sorted = game.boardTiles.slice().sort((a, b) => a.z - b.z);
+  for (const tile of sorted) {
+    if (tile.collected) continue;
+    const blocked = isBlocked(tile);
+    const node = makeTileElement(tile, { faceUp: !blocked });
+    node.style.position = 'absolute';
+    node.style.left = (tile.x * CELL) + 'px';
+    node.style.top  = (tile.y * CELL) + 'px';
+    // +z so higher-stage tiles paint above. Add a small per-tile bump on hover
+    // via the .draggable:hover rule.
+    node.style.zIndex = String(100 + tile.z);
+    const shadow = 2 + tile.z * 2;
+    node.style.boxShadow = `0 ${shadow}px ${shadow * 2}px rgba(0,0,0,${Math.min(0.18 + tile.z * 0.05, 0.5)})`;
+    if (!blocked) setupTileDrag(node, tile);
+    board.appendChild(node);
+  }
+}
+
+function renderSlots() {
+  const bar = el('slotsBar');
+  bar.innerHTML = '';
+  for (let i = 0; i < game.slots.length; i++) {
+    const slot = game.slots[i];
+    const cell = document.createElement('div');
+    cell.className = 'slot-cell';
+
+    // Always render the category label slot so empty slots reserve the same
+    // vertical space as filled ones — keeps all slot boxes aligned by Y.
+    const cat = document.createElement('div');
+    cat.className = 'slot-category';
+    cat.textContent = slot.categoryTile ? slot.categoryTile.categoryId : ' ';
+    cell.appendChild(cat);
+
+    const node = document.createElement('div');
+    node.className = 'slot';
+    node.dataset.slotIdx = String(i);
+    if (slot.topTile) {
+      node.classList.add('has-tile');
+      const stackDepth = 1 + slot.count;
+      if (stackDepth > 1) node.classList.add('has-stack');
+      const tNode = makeTileElement(slot.topTile, { faceUp: true });
+      node.appendChild(tNode);
+    } else {
+      node.textContent = 'empty';
+    }
+    setupSlotDrop(node, i);
+    cell.appendChild(node);
+
+    if (slot.categoryTile) {
+      const total = totalForCategory(slot.categoryTile.categoryId);
+      const counter = document.createElement('div');
+      counter.className = 'slot-counter' + (slot.count >= total && total > 0 ? ' full' : '');
+      counter.textContent = slot.count + '/' + total;
+      cell.appendChild(counter);
+    }
+
+    bar.appendChild(cell);
+  }
+}
+
+function renderStock() {
+  renderWastePile();
+  renderStockPile();
+  el('wasteCount').textContent = String(game.wastePile.length);
+  el('stockDeckCount').textContent = String(game.stockDeck.length);
+}
+
+// Waste pile (left): face-up cards the player has flipped from stock. Top is
+// the most recently flipped and is the only draggable card.
+function renderWastePile() {
+  const wrap = el('wastePileWrap');
+  wrap.innerHTML = '';
+  const total = game.wastePile.length;
+  if (total === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'pile-empty';
+    empty.textContent = '—';
+    wrap.appendChild(empty);
+    return;
+  }
+  for (let offset = 2; offset >= 1; offset--) {
+    const idx = total - 1 - offset;
+    if (idx < 0) continue;
+    const peek = game.wastePile[idx];
+    const node = makeTileElement(peek, { faceUp: true });
+    node.classList.add('behind-' + offset);
+    wrap.appendChild(node);
+  }
+  const top = game.wastePile[total - 1];
+  const topEl = makeTileElement(top, { faceUp: true });
+  topEl.classList.add('active');
+  setupTileDrag(topEl, top);
+  wrap.appendChild(topEl);
+}
+
+// Stock pile (right): face-down deck. Tap the top card to flip it onto the
+// waste pile. Each flip costs one move.
+function renderStockPile() {
+  const wrap = el('stockPileWrap');
+  wrap.innerHTML = '';
+  const total = game.stockDeck.length;
+  if (total === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'pile-empty';
+    if (game.wastePile.length > 0) {
+      empty.classList.add('recycle');
+      empty.textContent = '↻';
+      empty.title = 'Tap to recycle the waste pile back into stock';
+      empty.addEventListener('click', flipFromStock);
+    } else {
+      empty.textContent = 'empty';
+    }
+    wrap.appendChild(empty);
+    return;
+  }
+  for (let offset = 2; offset >= 1; offset--) {
+    if (offset >= total) continue;
+    const peek = game.stockDeck[offset];
+    const node = makeTileElement(peek, { faceUp: false });
+    node.classList.add('behind-' + offset);
+    wrap.appendChild(node);
+  }
+  const top = game.stockDeck[0];
+  const topEl = makeTileElement(top, { faceUp: false });
+  topEl.classList.add('active');
+  topEl.addEventListener('click', flipFromStock);
+  wrap.appendChild(topEl);
+}
+
+// Reshuffle only the tiles still on the board, in place — positions stay,
+// (categoryId, wordId) pairs get redistributed. Counts as one move.
+function shuffleBoardTiles() {
+  const alive = game.boardTiles.filter(t => !t.collected);
+  if (alive.length < 2) return;
+  // Capture pre-shuffle identities so undo can restore each tile's original
+  // (categoryId, wordId, isCategory) regardless of where they got shuffled to.
+  const snapshot = alive.map(t => ({
+    ref: t,
+    categoryId: t.categoryId, wordId: t.wordId, isCategory: t.isCategory,
+  }));
+  const prevMoves = game.movesLeft;
+
+  const pairs = snapshot.map(s => ({
+    categoryId: s.categoryId, wordId: s.wordId, isCategory: s.isCategory,
+  }));
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+  }
+  for (let i = 0; i < alive.length; i++) {
+    alive[i].categoryId = pairs[i].categoryId;
+    alive[i].wordId = pairs[i].wordId;
+    alive[i].isCategory = pairs[i].isCategory;
+  }
+  game.movesLeft = Math.max(0, game.movesLeft - 1);
+
+  game.history.push(() => {
+    for (const s of snapshot) {
+      s.ref.categoryId = s.categoryId;
+      s.ref.wordId = s.wordId;
+      s.ref.isCategory = s.isCategory;
+    }
+    game.movesLeft = prevMoves;
+  });
+
+  render();
+  checkEndState();
+}
+
+function flipFromStock() {
+  const prevMoves = game.movesLeft;
+  if (game.stockDeck.length === 0) {
+    if (game.wastePile.length === 0) return;
+    const recycled = game.wastePile;
+    for (const t of recycled) t.loc = 'stock';
+    game.stockDeck = recycled;
+    game.wastePile = [];
+    game.history.push(() => {
+      for (const t of recycled) t.loc = 'waste';
+      game.wastePile = recycled.slice();
+      game.stockDeck = [];
+      game.movesLeft = prevMoves;
+    });
+  } else {
+    const tile = game.stockDeck.shift();
+    tile.loc = 'waste';
+    game.wastePile.push(tile);
+    game.history.push(() => {
+      const i = game.wastePile.indexOf(tile);
+      if (i >= 0) game.wastePile.splice(i, 1);
+      tile.loc = 'stock';
+      game.stockDeck.unshift(tile);
+      game.movesLeft = prevMoves;
+    });
+  }
+  game.movesLeft = Math.max(0, game.movesLeft - 1);
+  render();
+  checkEndState();
+}
+
+function render() {
+  renderHeader();
+  renderBoard();
+  renderSlots();
+  renderStock();
+  renderControls();
+}
+
+function renderControls() {
+  const aliveCount = game.boardTiles.reduce((n, t) => n + (t.collected ? 0 : 1), 0);
+  el('shuffleBtn').disabled = aliveCount < 2 || game.movesLeft <= 0;
+  el('undoBtn').disabled = game.history.length === 0;
+}
+
+function undo() {
+  if (!game || game.history.length === 0) return;
+  const revert = game.history.pop();
+  revert();
+  hideEndPopup();
+  render();
+}
+
+function checkEndState() {
+  const onBoard = game.boardTiles.filter(t => !t.collected).length;
+  const remaining = onBoard + game.stockDeck.length + game.wastePile.length;
+  if (remaining === 0) {
+    toast('All tiles collected — you win!', 'win');
+    return;
+  }
+  if (game.movesLeft <= 0) {
+    showEndPopup('Out of moves', 'You ran out of moves before clearing the board.');
+    return;
+  }
+  if (!anyPlayableTile()) {
+    showEndPopup('No moves available', 'No tile can be placed in any slot — restart to shuffle.');
+  }
+}
+
+// True if any remaining tile (board, stock deck, or waste) could legally drop
+// into any slot under current state. Includes blocked board tiles because
+// they may become unblocked once tiles above them are collected.
+function anyPlayableTile() {
+  const pool = [];
+  for (const t of game.boardTiles) if (!t.collected) pool.push(t);
+  for (const t of game.stockDeck) pool.push(t);
+  for (const t of game.wastePile) pool.push(t);
+  for (const tile of pool) {
+    for (let i = 0; i < game.slots.length; i++) {
+      if (canAcceptDrop(i, tile)) return true;
+    }
+  }
+  return false;
+}
+
+function showEndPopup(title, message) {
+  el('popupTitle').textContent = title;
+  el('popupMessage').textContent = message;
+  el('endPopup').hidden = false;
+}
+function hideEndPopup() { el('endPopup').hidden = true; }
+
+// Reshuffle: pool every wordId currently in the level definition (board tiles
+// + stock entries), shuffle, then redistribute to the same board positions
+// and stock slots. CategoryIds are re-derived from the level's categories list.
+function restartWithShuffle() {
+  hideEndPopup();
+  const level = game.level;
+
+  const wordToCategory = new Map();
+  const categoryIds = new Set();
+  for (const c of (level.categories || [])) {
+    categoryIds.add(c.categoryId);
+    for (const w of (c.wordsIds || [])) wordToCategory.set(String(w), c.categoryId);
+  }
+
+  const allWords = [];
+  for (const stage of (level.stages || [])) {
+    for (const t of (stage.tiles || [])) allWords.push(String(t.wordId));
+  }
+  for (const s of (level.stock || [])) allWords.push(String(s));
+
+  for (let i = allWords.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allWords[i], allWords[j]] = [allWords[j], allWords[i]];
+  }
+
+  let idx = 0;
+  const newStages = (level.stages || []).map(stage => ({
+    stageId: stage.stageId,
+    z: stage.z,
+    tiles: (stage.tiles || []).map(t => {
+      const word = allWords[idx++];
+      const catId = categoryIds.has(word) ? word : (wordToCategory.get(word) || word);
+      return { x: t.x, y: t.y, categoryId: catId, wordId: word };
+    })
+  }));
+  const newStock = allWords.slice(idx);
+
+  initGame({ ...level, stages: newStages, stock: newStock });
+}
+
+let toastTimer = null;
+function toast(msg, kind) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.className = 'show ' + (kind || '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 4000);
+}
+
+el('resetBtn').addEventListener('click', () => {
+  if (game && game.level) restartWithShuffle();
+});
+el('popupRestart').addEventListener('click', () => {
+  if (game && game.level) restartWithShuffle();
+});
+el('shuffleBtn').addEventListener('click', () => {
+  if (!game) return;
+  shuffleBoardTiles();
+});
+el('undoBtn').addEventListener('click', undo);
+
+el('loadJson').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    initGame(data);
+  } catch (err) {
+    toast('Failed to parse level: ' + err.message, 'lose');
+  } finally {
+    e.target.value = '';
+  }
+});
+
+async function loadDefault() {
+  if (location.protocol !== 'file:') {
+    try {
+      const resp = await fetch('levels/level_1.json', { cache: 'no-store' });
+      if (resp.ok) { initGame(await resp.json()); return; }
+    } catch (_) { /* fall through */ }
+  }
+  const levels = window.MAHJONG_LEVELS || {};
+  const keys = Object.keys(levels);
+  const preferred = ['level-1', 'level_1'].find(k => k in levels) || keys[0];
+  if (preferred) {
+    initGame(levels[preferred]);
+  } else {
+    document.body.innerHTML =
+      '<div style="padding:20px;color:#f87171;font-family:system-ui">' +
+      'No level data found. Make sure <code>levels/level_1.js</code> ' +
+      '(for file://) or <code>levels/level_1.json</code> (over HTTP) is reachable.' +
+      '</div>';
+  }
+}
+
+loadDefault();
+</script>
+</body>
+</html>

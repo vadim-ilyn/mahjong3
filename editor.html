@@ -155,7 +155,7 @@
     <span class="spacer"></span>
     <button id="loadBtn">Load JSON</button>
     <input type="file" id="loadJson" accept=".json,application/json" hidden>
-    <button id="saveJson">Download JSON</button>
+    <button id="saveJson">Download JSON + JS</button>
   </header>
 
   <main>
@@ -702,6 +702,17 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+function downloadBlob(name, type, text) {
+  const blob = new Blob([text], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 el('saveJson').addEventListener('click', () => {
   const out = {
     levelId: state.levelId,
@@ -720,14 +731,20 @@ el('saveJson').addEventListener('click', () => {
       })),
     })),
   };
-  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (state.levelId || 'level') + '.json';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const base = state.levelId || 'level';
+  const jsonText = JSON.stringify(out, null, 2);
+  downloadBlob(base + '.json', 'application/json', jsonText);
+
+  // Sidecar so game.html can load this level under file://, where fetch() is
+  // blocked. Registers the level on window.MAHJONG_LEVELS keyed by levelId.
+  const jsText =
+    '// Auto-generated alongside ' + base + '.json by editor.html.\n' +
+    '// Regenerated whenever you press "Download JSON + JS".\n' +
+    '(function () {\n' +
+    '  if (!window.MAHJONG_LEVELS) window.MAHJONG_LEVELS = {};\n' +
+    '  window.MAHJONG_LEVELS[' + JSON.stringify(base) + '] = ' + jsonText + ';\n' +
+    '})();\n';
+  downloadBlob(base + '.js', 'application/javascript', jsText);
 });
 
 el('loadBtn').addEventListener('click', () => el('loadJson').click());
