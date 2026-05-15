@@ -225,7 +225,21 @@
     display: flex; flex-direction: column; gap: 8px;
     align-self: center;
   }
-  #stockBar .actions-col { margin-right: 200px; }
+  .moves-counter {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 2px; align-self: center;
+    min-width: 56px;
+  }
+  .moves-label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .moves-value {
+    font-size: 22px; font-weight: 700;
+    color: var(--ink); line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .moves-value.low { color: var(--bad); }
   .actions-col button {
     background: var(--accent); color: #0f172a; border: 0;
     padding: 10px 18px; border-radius: 6px; cursor: pointer;
@@ -300,6 +314,9 @@
        padding, scaling the stock-pile tiles to 0.85, and shrinking the
        action buttons so they no longer dominate the panel height. */
     #stockBar { padding: 6px 8px; gap: 8px; }
+    .moves-counter { min-width: 44px; gap: 1px; }
+    .moves-label { font-size: 10px; }
+    .moves-value { font-size: 18px; }
     #stockBar .actions-col { margin-right: 0; gap: 4px; }
     .actions-col button {
       padding: 5px 10px; min-width: 0; font-size: 12px;
@@ -344,7 +361,7 @@
 </style>
 </head>
 <body>
-  <header class="topbar">
+  <header class="topbar" hidden>
     <div class="meta" id="levelMeta"></div>
     <div class="topbar-right">
       <label for="loadJson" title="Load a different level JSON">Load level…</label>
@@ -355,6 +372,10 @@
 
   <main>
     <div id="stockBar">
+      <div class="moves-counter" title="Moves remaining">
+        <div class="moves-label">Moves</div>
+        <div class="moves-value" id="movesValue">0</div>
+      </div>
       <div class="actions-col">
         <button id="shuffleBtn" title="Shuffle remaining board tiles (costs 1 move)">Shuffle</button>
         <button id="undoBtn" title="Undo the last move">Undo</button>
@@ -730,6 +751,11 @@ function renderHeader() {
     `tiles left: <b>${remaining}</b>`,
     `slots: <b>${filled}/${game.slots.length}</b>`,
   ].filter(Boolean).join(' · ');
+  const mv = el('movesValue');
+  if (mv) {
+    mv.textContent = String(game.movesLeft);
+    mv.classList.toggle('low', game.movesLeft <= Math.max(5, game.movesStart * 0.1));
+  }
 }
 
 function renderBoard() {
