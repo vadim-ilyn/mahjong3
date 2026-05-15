@@ -37,6 +37,10 @@
     gap: 16px; align-items: center;
     padding: 10px 16px; background: #020617; border-bottom: 1px solid var(--line);
   }
+  /* The [hidden] attribute on .topbar would normally trigger UA
+     display:none, but the author rule above (specificity 0,1,1) wins
+     over the UA rule (0,1,0). This more-specific rule actually hides it. */
+  header.topbar[hidden] { display: none; }
   .meta {
     justify-self: start;
     color: var(--muted); font-size: 16px;
