@@ -1,0 +1,137 @@
+[
+    {
+        "categoryId": "Dances",
+        "icon": false,
+        "wordsIds": [
+            "Samba",
+            "Rumba",
+            "Tango",
+            "Waltz",
+            "Salsa",
+            "Foxtrot",
+            "Polka",
+            "Cancan"
+        ]
+    },
+    {
+    "categoryId": "Astro",
+    "icon": false,
+    "wordsIds": [
+      "Star",
+      "Comet",
+      "Meteor",
+      "Asteroid",
+      "Nova",
+      "Pulsar",
+      "Planet",
+      "Cluster"
+    ]
+    },
+    {
+    "categoryId": "Wedding",
+    "icon": false,
+    "wordsIds": [
+      "Ceremony",
+      "Proposal",
+      "Bride",
+      "Groom",
+      "Vows",
+      "Rings",
+      "Bouquet",
+      "Veil"
+    ]
+  },
+   {
+    "categoryId": "Photos",
+    "icon": false,
+    "wordsIds": [
+      "Selfie",
+      "Portrait",
+      "Snapshot",
+      "Polaroid",
+      "Image",
+      "Closeup",
+      "Headshot",
+      "Panorama"
+    ]
+  },
+   {
+    "categoryId": "Oceans",
+    "icon": false,
+    "wordsIds": [
+      "Pacific",
+      "Atlantic",
+      "Indian",
+      "Arctic",
+      "Southern",
+      "Celtic",
+      "Bering",
+      "Adriatic"
+    ]
+  },
+  {
+    "categoryId": "Fabrics",
+    "icon": false,
+    "wordsIds": [
+      "Flannel",
+      "Cotton",
+      "Silk",
+      "Satin",
+      "Velvet",
+      "Linen"
+    ]
+  },
+   {
+    "categoryId": "Elements",
+    "icon": false,
+    "wordsIds": [
+      "Earth",
+      "Water",
+      "Fire",
+      "Air"
+    ]
+  },
+   {
+    "categoryId": "Expert",
+    "icon": false,
+    "wordsIds": [
+      "Master",
+      "Maestro",
+      "Guru",
+      "Virtuoso",
+      "Genius"
+    ]
+  },
+  {
+    "categoryId": "Mythos",
+    "icon": false,
+    "wordsIds": [
+      "Gorgon",
+      "Cyclops",
+      "Chimera",
+      "Basilisk"
+    ]
+  },
+  {
+    "categoryId": "Hats",
+    "icon": true,
+    "wordsIds": [
+      "Pink wide hat",
+      "Red star cap",
+      "Fedora hat",
+      "Winter hat",
+      "Captain hat"
+    ]
+  },
+   {
+    "categoryId": "Jewelry",
+    "icon": true,
+    "wordsIds": [
+      "Heart pendant",
+      "Pearl bracelet",
+      "Blue gem ring",
+      "Blue earrings",
+      "Blue gem pendant"
+    ]
+  }
+]

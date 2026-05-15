@@ -1,0 +1,373 @@
+{
+  "levelId": "level-1",
+  "slotsAmount": 6,
+  "movesCount": 120,
+  "stock": [],
+  "grid": {
+    "cols": 80,
+    "rows": 80,
+    "cellStep": 1
+  },
+  "stages": [
+    {
+      "stageId": "stage-1",
+      "z": 0,
+      "tiles": [
+        {
+          "x": 31,
+          "y": 16,
+          "categoryId": "world-1",
+          "wordId": "50"
+        },
+        {
+          "x": 35,
+          "y": 16,
+          "categoryId": "cat-1",
+          "wordId": "6"
+        },
+        {
+          "x": 39,
+          "y": 28,
+          "categoryId": "cat-2",
+          "wordId": "6"
+        },
+        {
+          "x": 31,
+          "y": 28,
+          "categoryId": "cat-2",
+          "wordId": "4"
+        },
+        {
+          "x": 35,
+          "y": 28,
+          "categoryId": "cat-2",
+          "wordId": "5"
+        },
+        {
+          "x": 39,
+          "y": 22,
+          "categoryId": "cat-2",
+          "wordId": "3"
+        },
+        {
+          "x": 31,
+          "y": 22,
+          "categoryId": "cat-2",
+          "wordId": "2"
+        },
+        {
+          "x": 39,
+          "y": 16,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        }
+      ]
+    },
+    {
+      "stageId": "stage-2",
+      "z": 1,
+      "tiles": [
+        {
+          "x": 29,
+          "y": 13,
+          "categoryId": "cat-3",
+          "wordId": "1"
+        },
+        {
+          "x": 41,
+          "y": 13,
+          "categoryId": "cat-3",
+          "wordId": "2"
+        },
+        {
+          "x": 33,
+          "y": 13,
+          "categoryId": "cat-3",
+          "wordId": "3"
+        },
+        {
+          "x": 41,
+          "y": 25,
+          "categoryId": "cat-3",
+          "wordId": "4"
+        },
+        {
+          "x": 41,
+          "y": 19,
+          "categoryId": "cat-3",
+          "wordId": "5"
+        },
+        {
+          "x": 37,
+          "y": 13,
+          "categoryId": "cat-3",
+          "wordId": "6"
+        },
+        {
+          "x": 41,
+          "y": 31,
+          "categoryId": "cat-4",
+          "wordId": "1"
+        },
+        {
+          "x": 37,
+          "y": 31,
+          "categoryId": "cat-4",
+          "wordId": "2"
+        },
+        {
+          "x": 29,
+          "y": 19,
+          "categoryId": "cat-4",
+          "wordId": "3"
+        },
+        {
+          "x": 33,
+          "y": 31,
+          "categoryId": "cat-4",
+          "wordId": "4"
+        },
+        {
+          "x": 29,
+          "y": 31,
+          "categoryId": "cat-4",
+          "wordId": "5"
+        },
+        {
+          "x": 29,
+          "y": 25,
+          "categoryId": "cat-4",
+          "wordId": "6"
+        }
+      ]
+    },
+    {
+      "stageId": "stage-3",
+      "z": 2,
+      "tiles": [
+        {
+          "x": 27,
+          "y": 10,
+          "categoryId": "cat-5",
+          "wordId": "1"
+        },
+        {
+          "x": 43,
+          "y": 10,
+          "categoryId": "cat-5",
+          "wordId": "2"
+        },
+        {
+          "x": 27,
+          "y": 16,
+          "categoryId": "cat-5",
+          "wordId": "4"
+        },
+        {
+          "x": 35,
+          "y": 10,
+          "categoryId": "cat-5",
+          "wordId": "5"
+        },
+        {
+          "x": 31,
+          "y": 10,
+          "categoryId": "cat-5",
+          "wordId": "6"
+        },
+        {
+          "x": 39,
+          "y": 10,
+          "categoryId": "cat-5",
+          "wordId": "3"
+        },
+        {
+          "x": 27,
+          "y": 22,
+          "categoryId": "cat-6",
+          "wordId": "1"
+        },
+        {
+          "x": 39,
+          "y": 34,
+          "categoryId": "cat-6",
+          "wordId": "2"
+        },
+        {
+          "x": 31,
+          "y": 34,
+          "categoryId": "cat-6",
+          "wordId": "4"
+        },
+        {
+          "x": 27,
+          "y": 34,
+          "categoryId": "cat-6",
+          "wordId": "5"
+        },
+        {
+          "x": 27,
+          "y": 28,
+          "categoryId": "cat-6",
+          "wordId": "1"
+        },
+        {
+          "x": 35,
+          "y": 34,
+          "categoryId": "cat-6",
+          "wordId": "3"
+        },
+        {
+          "x": 43,
+          "y": 16,
+          "categoryId": "cat-7",
+          "wordId": "1"
+        },
+        {
+          "x": 43,
+          "y": 22,
+          "categoryId": "cat-7",
+          "wordId": "2"
+        },
+        {
+          "x": 43,
+          "y": 34,
+          "categoryId": "cat-7",
+          "wordId": "4"
+        },
+        {
+          "x": 43,
+          "y": 28,
+          "categoryId": "cat-7",
+          "wordId": "3"
+        }
+      ]
+    },
+    {
+      "stageId": "stage-4",
+      "z": 3,
+      "tiles": [
+        {
+          "x": 29,
+          "y": 7,
+          "categoryId": "cat-7",
+          "wordId": "6"
+        },
+        {
+          "x": 25,
+          "y": 7,
+          "categoryId": "cat-7",
+          "wordId": "5"
+        },
+        {
+          "x": 33,
+          "y": 7,
+          "categoryId": "cat-1",
+          "wordId": "7"
+        },
+        {
+          "x": 25,
+          "y": 13,
+          "categoryId": "cat-2",
+          "wordId": "7"
+        },
+        {
+          "x": 45,
+          "y": 7,
+          "categoryId": "cat-3",
+          "wordId": "7"
+        },
+        {
+          "x": 37,
+          "y": 7,
+          "categoryId": "cat-4",
+          "wordId": "7"
+        },
+        {
+          "x": 25,
+          "y": 25,
+          "categoryId": "cat-5",
+          "wordId": "7"
+        },
+        {
+          "x": 25,
+          "y": 19,
+          "categoryId": "cat-6",
+          "wordId": "7"
+        },
+        {
+          "x": 41,
+          "y": 7,
+          "categoryId": "cat-7",
+          "wordId": "7"
+        },
+        {
+          "x": 45,
+          "y": 37,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 41,
+          "y": 37,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 37,
+          "y": 37,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 29,
+          "y": 37,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 25,
+          "y": 37,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 33,
+          "y": 37,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 25,
+          "y": 31,
+          "categoryId": "cat-2",
+          "wordId": "1"
+        },
+        {
+          "x": 45,
+          "y": 13,
+          "categoryId": "cat-1",
+          "wordId": "1"
+        },
+        {
+          "x": 45,
+          "y": 19,
+          "categoryId": "cat-1",
+          "wordId": "2"
+        },
+        {
+          "x": 45,
+          "y": 25,
+          "categoryId": "cat-1",
+          "wordId": "4"
+        },
+        {
+          "x": 45,
+          "y": 31,
+          "categoryId": "cat-1",
+          "wordId": "3"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mahjong Layer Editor</title>
+<style>
+  :root {
+    --cell: 16px;
+    --bg: #f4f4f5;
+    --panel: #ffffff;
+    --line: #e4e4e7;
+    --ink: #18181b;
+    --muted: #71717a;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); background: var(--bg);
+    display: flex; flex-direction: column;
+  }
+
+  header.topbar {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 8px 12px; background: #18181b; color: #fafafa;
+  }
+  header.topbar label { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+  header.topbar input {
+    background: #27272a; border: 1px solid #3f3f46; color: #fafafa;
+    padding: 4px 8px; border-radius: 4px; font: inherit;
+  }
+  header.topbar button {
+    background: var(--accent); color: white; border: 0;
+    padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    font: inherit; font-weight: 500;
+  }
+  header.topbar button:hover { background: var(--accent-hover); }
+  header.topbar .spacer { flex: 1; }
+
+  #stageTabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .stage-tab {
+    background: #27272a; color: #d4d4d8; border: 0;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    font: inherit; font-size: 13px;
+  }
+  .stage-tab:hover { background: #3f3f46; }
+  .stage-tab.active { background: #fafafa; color: #18181b; }
+
+  main {
+    flex: 1; display: grid; grid-template-columns: 300px 1fr;
+    min-height: 0;
+  }
+  aside.sidebar {
+    background: var(--panel); padding: 12px; overflow-y: auto;
+    border-right: 1px solid var(--line);
+  }
+  aside section { margin-bottom: 18px; }
+  aside h3 {
+    margin: 0 0 8px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted);
+  }
+  aside label {
+    display: block; margin-bottom: 6px; font-size: 13px; color: #3f3f46;
+  }
+  aside input, aside select {
+    width: 100%; padding: 5px 8px;
+    border: 1px solid #d4d4d8; border-radius: 4px;
+    font: inherit; margin-top: 2px;
+  }
+  aside .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  aside button {
+    border: 0; padding: 6px 10px; border-radius: 4px;
+    cursor: pointer; font: inherit; font-weight: 500;
+    background: #e4e4e7; color: var(--ink);
+  }
+  aside button:hover { background: #d4d4d8; }
+  aside button.danger { background: var(--danger); color: white; }
+  aside button.danger:hover { background: var(--danger-hover); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .grid-2 label { margin: 0; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row > button { flex: 1; }
+
+  .swatch-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 4px;
+  }
+  .swatch {
+    width: 22px; height: 22px; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.15);
+    flex: 0 0 auto;
+  }
+  .cat-list {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+  }
+  .cat-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 8px; border-radius: 999px; font-size: 12px;
+    cursor: pointer; user-select: none;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: #fff;
+  }
+  .cat-chip .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .cat-chip.active { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  .boardWrap {
+    overflow: auto; padding: 24px;
+  }
+  #board {
+    position: relative; background: #ffffff;
+    border: 1px solid #d4d4d8;
+    background-image:
+      linear-gradient(to right, #f4f4f5 1px, transparent 1px),
+      linear-gradient(to bottom, #f4f4f5 1px, transparent 1px);
+    background-size: var(--cell) var(--cell);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .tile {
+    position: absolute;
+    width: calc(var(--cell) * 4); height: calc(var(--cell) * 6);
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: white; font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.18);
+    cursor: grab; user-select: none;
+    border: 2px solid transparent;
+    transition: box-shadow 0.1s, transform 0.05s;
+    padding: 2px; text-align: center; overflow: hidden;
+  }
+  .tile .word { font-size: 13px; line-height: 1.1; word-break: break-word; }
+  .tile .cat  { font-size: 10px; opacity: 0.85; margin-top: 2px; line-height: 1.1; }
+  .tile:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.22); }
+  .tile:active { cursor: grabbing; }
+  .tile.selected {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 2px white, 0 0 0 4px var(--ink);
+  }
+  .tile.ghost { opacity: 0.22; pointer-events: none; filter: grayscale(0.6); }
+  .tile.dark-ink { color: #18181b; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <label>Level ID <input id="levelId" value="level-1"></label>
+    <div id="stageTabs"></div>
+    <button id="addStage" title="Add a new stage">+ Stage</button>
+    <span class="spacer"></span>
+    <button id="loadBtn">Load JSON</button>
+    <input type="file" id="loadJson" accept=".json,application/json" hidden>
+    <button id="saveJson">Download JSON</button>
+  </header>
+
+  <main>
+    <aside class="sidebar">
+      <section>
+        <h3>Level config</h3>
+        <label>slotsAmount <input type="number" id="cfgSlotsAmount" min="0" value="7"></label>
+        <label>movesCount <input type="number" id="cfgMovesCount" min="0" value="100"></label>
+        <label>stock (one entry per line)
+          <textarea id="cfgStock" rows="4" style="width:100%; padding:5px 8px; border:1px solid #d4d4d8; border-radius:4px; font:inherit; margin-top:2px; resize:vertical;"></textarea>
+        </label>
+        <div class="hint">These three fields are saved at the level root of the exported JSON.</div>
+      </section>
+
+      <section>
+        <h3>Brush — new tile</h3>
+        <label>categoryId
+          <input id="brushCategoryId" value="cat-1" list="catSuggestions">
+        </label>
+        <datalist id="catSuggestions"></datalist>
+        <label>wordId <input id="brushWordId" value="1"></label>
+        <div class="swatch-row">
+          <span class="hint" style="margin: 0;">Color:</span>
+          <div class="swatch" id="brushSwatch"></div>
+        </div>
+        <div class="cat-list" id="catList"></div>
+        <div class="hint">Click an empty cell on the board to place a tile. Click any chip above to reuse that categoryId.</div>
+      </section>
+
+      <section>
+        <h3>Tools</h3>
+        <button id="randomizeWordIds">Randomize wordIds (1–200, unique)</button>
+        <div class="hint" style="margin-bottom: 10px;">Assigns every tile across all stages a unique random integer from 1 to 200.</div>
+        <button id="applyCategoriesBtn">Apply categories from JSON…</button>
+        <input type="file" id="applyCategoriesFile" accept=".json,application/json" hidden>
+        <div class="hint">Pick a categories file (e.g. <code>categories_set_1.json</code>). For each category it builds pairs <code>{cat, cat}</code> then <code>{cat, word}</code> for every word, shuffles them, and assigns one pair per tile.</div>
+      </section>
+
+      <section id="selPanel" hidden>
+        <h3>Selected tile</h3>
+        <label>categoryId <input id="selCategoryId"></label>
+        <label>wordId <input id="selWordId"></label>
+        <div class="grid-2">
+          <label>x <input type="number" id="selX"></label>
+          <label>y <input type="number" id="selY"></label>
+        </div>
+        <div class="hint" style="margin-bottom: 8px;">Drag tile on the board to move it.</div>
+        <button class="danger" id="delTile">Delete tile</button>
+      </section>
+
+      <section>
+        <h3>Current stage</h3>
+        <label>stageId <input id="stageId"></label>
+        <label>z <input type="number" id="stageZ"></label>
+        <div class="row">
+          <button id="delStage" class="danger">Delete stage</button>
+        </div>
+        <label style="margin-top: 8px;">
+          <input type="checkbox" id="showOthers" checked style="width: auto; margin-right: 4px;">
+          Show stage below as ghost
+        </label>
+      </section>
+
+      <section>
+        <h3>Board grid</h3>
+        <div class="grid-2">
+          <label>cols <input type="number" id="gridCols" min="1" value="24"></label>
+          <label>rows <input type="number" id="gridRows" min="1" value="18"></label>
+        </div>
+        <label>cellStep <input type="number" id="gridStep" min="1" step="1" value="1"></label>
+        <div class="hint">Coords are in grid cells (1 cell = 16px). A tile is 4×6 cells. cellStep is the snap unit.</div>
+      </section>
+
+      <section>
+        <h3>Shortcuts</h3>
+        <div class="hint">
+          Click empty cell → place tile<br>
+          Click tile → select<br>
+          Drag tile → move<br>
+          Delete / Backspace → delete<br>
+          Escape → deselect
+        </div>
+      </section>
+    </aside>
+
+    <section class="boardWrap">
+      <div id="board"></div>
+    </section>
+  </main>
+
+<script>
+'use strict';
+
+const CELL = 16;
+const TILE_W = 4; // tile width in cells (one cell = CELL px)
+const TILE_H = 6; // tile height in cells
+
+// Palette used to auto-color categoryIds. Each unique string gets a stable color.
+const PALETTE = [
+  { bg: '#3b82f6', dark: false }, // blue
+  { bg: '#ef4444', dark: false }, // red
+  { bg: '#22c55e', dark: false }, // green
+  { bg: '#eab308', dark: true  }, // yellow
+  { bg: '#a855f7', dark: false }, // purple
+  { bg: '#f97316', dark: false }, // orange
+  { bg: '#06b6d4', dark: true  }, // cyan
+  { bg: '#ec4899', dark: false }, // pink
+  { bg: '#14b8a6', dark: false }, // teal
+  { bg: '#84cc16', dark: true  }, // lime
+  { bg: '#a16207', dark: false }, // brown
+  { bg: '#4338ca', dark: false }, // indigo
+  { bg: '#d946ef', dark: false }, // fuchsia
+  { bg: '#f43f5e', dark: false }, // rose
+  { bg: '#059669', dark: false }, // emerald
+  { bg: '#0ea5e9', dark: false }, // sky
+  { bg: '#7c3aed', dark: false }, // violet
+  { bg: '#6b7280', dark: false }, // gray
+  { bg: '#6ee7b7', dark: true  }, // mint
+  { bg: '#fdba74', dark: true  }, // peach
+];
+
+const el = (id) => document.getElementById(id);
+
+const state = {
+  levelId: 'level-1',
+  slotsAmount: 7,
+  movesCount: 100,
+  stock: [],
+  categories: [],
+  grid: { cols: 24, rows: 18, cellStep: 1 },
+  stages: [{ stageId: 'stage-1', z: 0, tiles: [] }],
+  currentStageIdx: 0,
+  selectedTileIdx: null,
+  brush: { categoryId: 'cat-1', wordId: '1' },
+  showOthers: true,
+};
+
+const currentStage = () => state.stages[state.currentStageIdx];
+const selectedTile = () => state.selectedTileIdx == null ? null : currentStage().tiles[state.selectedTileIdx];
+
+// Unique color per categoryId: first 20 ids use PALETTE; beyond that we
+// synthesize visually distinct HSL colors via golden-angle hue stepping.
+const colorCache = new Map();
+let nextColorIdx = 0;
+
+function pickColor(idx) {
+  if (idx < PALETTE.length) return PALETTE[idx];
+  const over = idx - PALETTE.length;
+  const hue = (over * 137.508) % 360;
+  const sat = 60 + ((over % 3) * 10);        // 60 / 70 / 80
+  const lit = 48 + (((over >> 1) % 3) * 8);  // 48 / 56 / 64
+  return { bg: `hsl(${hue.toFixed(1)} ${sat}% ${lit}%)`, dark: lit >= 60 };
+}
+
+function colorFor(categoryId) {
+  const key = String(categoryId ?? '');
+  let c = colorCache.get(key);
+  if (!c) {
+    c = pickColor(nextColorIdx++);
+    colorCache.set(key, c);
+  }
+  return c;
+}
+
+function allCategoryIds() {
+  const seen = new Set();
+  const out = [];
+  state.stages.forEach(s => s.tiles.forEach(t => {
+    if (!seen.has(t.categoryId)) { seen.add(t.categoryId); out.push(t.categoryId); }
+  }));
+  return out;
+}
+
+function render() {
+  renderStageTabs();
+  renderSidebar();
+  renderBoard();
+}
+
+function renderStageTabs() {
+  const tabs = el('stageTabs');
+  tabs.innerHTML = '';
+  state.stages.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'stage-tab' + (i === state.currentStageIdx ? ' active' : '');
+    b.textContent = `${s.stageId} (z=${s.z})`;
+    b.addEventListener('click', () => {
+      state.currentStageIdx = i;
+      state.selectedTileIdx = null;
+      render();
+    });
+    tabs.appendChild(b);
+  });
+}
+
+function renderSidebar() {
+  el('brushCategoryId').value = state.brush.categoryId;
+  el('brushWordId').value = state.brush.wordId;
+
+  const bc = colorFor(state.brush.categoryId);
+  el('brushSwatch').style.background = bc.bg;
+
+  // datalist suggestions + chip palette of existing categoryIds
+  const cats = allCategoryIds();
+  const dl = el('catSuggestions');
+  dl.innerHTML = '';
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c;
+    dl.appendChild(o);
+  });
+
+  const list = el('catList');
+  list.innerHTML = '';
+  cats.forEach(c => {
+    const chip = document.createElement('span');
+    chip.className = 'cat-chip' + (c === state.brush.categoryId ? ' active' : '');
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = colorFor(c).bg;
+    chip.appendChild(dot);
+    chip.appendChild(document.createTextNode(c));
+    chip.addEventListener('click', () => {
+      state.brush.categoryId = c;
+      render();
+    });
+    list.appendChild(chip);
+  });
+
+  const sel = selectedTile();
+  const selPanel = el('selPanel');
+  if (sel) {
+    selPanel.hidden = false;
+    el('selCategoryId').value = sel.categoryId;
+    el('selWordId').value = sel.wordId;
+    el('selX').value = sel.x;
+    el('selY').value = sel.y;
+  } else {
+    selPanel.hidden = true;
+  }
+
+  const stage = currentStage();
+  el('stageId').value = stage.stageId;
+  el('stageZ').value = stage.z;
+
+  el('gridCols').value = state.grid.cols;
+  el('gridRows').value = state.grid.rows;
+  el('gridStep').value = state.grid.cellStep;
+  el('showOthers').checked = state.showOthers;
+
+  el('cfgSlotsAmount').value = state.slotsAmount;
+  el('cfgMovesCount').value = state.movesCount;
+  // Don't overwrite the textarea while the user is typing in it.
+  if (document.activeElement !== el('cfgStock')) {
+    el('cfgStock').value = state.stock.join('\n');
+  }
+}
+
+function makeTileEl(t, ghost) {
+  const d = document.createElement('div');
+  d.className = 'tile' + (ghost ? ' ghost' : '');
+  const c = colorFor(t.categoryId);
+  d.style.background = c.bg;
+  if (c.dark) d.classList.add('dark-ink');
+  d.style.left = (t.x * CELL) + 'px';
+  d.style.top  = (t.y * CELL) + 'px';
+
+  const word = document.createElement('div');
+  word.className = 'word';
+  word.textContent = t.wordId;
+  d.appendChild(word);
+
+  const cat = document.createElement('div');
+  cat.className = 'cat';
+  cat.textContent = t.categoryId;
+  d.appendChild(cat);
+  return d;
+}
+
+function renderBoard() {
+  const { cols, rows } = state.grid;
+  const cellsW = Math.max(cols, TILE_W);
+  const cellsH = Math.max(rows, TILE_H);
+  const board = el('board');
+  board.style.width  = (cellsW * CELL) + 'px';
+  board.style.height = (cellsH * CELL) + 'px';
+  board.innerHTML = '';
+
+  if (state.showOthers) {
+    const cur = currentStage();
+    // Show the highest stage strictly below the current one (closest underneath).
+    let below = null;
+    state.stages.forEach((s, idx) => {
+      if (idx === state.currentStageIdx) return;
+      if (s.z >= cur.z) return;
+      if (!below || s.z > below.z) below = s;
+    });
+    if (below) below.tiles.forEach(t => board.appendChild(makeTileEl(t, true)));
+  }
+
+  currentStage().tiles.forEach((t, i) => {
+    const node = makeTileEl(t, false);
+    if (i === state.selectedTileIdx) node.classList.add('selected');
+    node.addEventListener('pointerdown', (e) => startDrag(e, i));
+    board.appendChild(node);
+  });
+}
+
+let dragState = null;
+
+function startDrag(e, tileIdx) {
+  e.preventDefault();
+  e.stopPropagation();
+  state.selectedTileIdx = tileIdx;
+  const t = currentStage().tiles[tileIdx];
+  dragState = {
+    tileIdx,
+    startX: t.x, startY: t.y,
+    pointerStart: { x: e.clientX, y: e.clientY },
+    moved: false,
+  };
+  render();
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragEnd);
+}
+
+function onDragMove(e) {
+  if (!dragState) return;
+  const dx = e.clientX - dragState.pointerStart.x;
+  const dy = e.clientY - dragState.pointerStart.y;
+  if (!dragState.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+  dragState.moved = true;
+  const t = currentStage().tiles[dragState.tileIdx];
+  const step = Math.max(1, state.grid.cellStep);
+  const snap = (delta) => Math.round(delta / (CELL * step)) * step;
+  const newX = Math.max(0, dragState.startX + snap(dx));
+  const newY = Math.max(0, dragState.startY + snap(dy));
+  if (newX !== t.x || newY !== t.y) {
+    t.x = newX; t.y = newY;
+    renderBoard();
+    el('selX').value = t.x;
+    el('selY').value = t.y;
+  }
+}
+
+function onDragEnd() {
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragEnd);
+  if (dragState && !dragState.moved) {
+    // pure click → keep selection only, refresh sidebar
+    renderSidebar();
+  }
+  dragState = null;
+}
+
+el('board').addEventListener('pointerdown', (e) => {
+  if (e.target !== el('board')) return;
+  const rect = el('board').getBoundingClientRect();
+  const step = Math.max(1, state.grid.cellStep);
+  const rawX = (e.clientX - rect.left) / CELL;
+  const rawY = (e.clientY - rect.top)  / CELL;
+  // Snap so the tile's top-left lands on a cellStep boundary, centered roughly under the cursor.
+  const x = Math.max(0, Math.round((rawX - TILE_W / 2) / step) * step);
+  const y = Math.max(0, Math.round((rawY - TILE_H / 2) / step) * step);
+  const newTile = {
+    x, y,
+    categoryId: state.brush.categoryId,
+    wordId: state.brush.wordId,
+  };
+  currentStage().tiles.push(newTile);
+  state.selectedTileIdx = currentStage().tiles.length - 1;
+  render();
+});
+
+el('levelId').addEventListener('input', (e) => { state.levelId = e.target.value; });
+
+el('cfgSlotsAmount').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value);
+  state.slotsAmount = Number.isFinite(v) && v >= 0 ? v : 0;
+});
+el('cfgMovesCount').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value);
+  state.movesCount = Number.isFinite(v) && v >= 0 ? v : 0;
+});
+el('cfgStock').addEventListener('input', (e) => {
+  state.stock = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+});
+
+el('applyCategoriesBtn').addEventListener('click', () => el('applyCategoriesFile').click());
+el('applyCategoriesFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data)) throw new Error('Top-level JSON must be an array of categories.');
+
+    const pairs = [];
+    for (const c of data) {
+      if (!c || typeof c.categoryId !== 'string') continue;
+      pairs.push({ categoryId: c.categoryId, wordId: c.categoryId });
+      const words = Array.isArray(c.wordsIds) ? c.wordsIds : [];
+      for (const w of words) pairs.push({ categoryId: c.categoryId, wordId: String(w) });
+    }
+    if (pairs.length === 0) throw new Error('No (categoryId, wordId) pairs found in file.');
+
+    const totalTiles = state.stages.reduce((n, s) => n + s.tiles.length, 0);
+    if (totalTiles === 0) { alert('No tiles on the board to apply pairs to.'); return; }
+    if (totalTiles > pairs.length) {
+      alert(`Not enough unique pairs: ${pairs.length} pairs vs ${totalTiles} tiles. Add more categories/words or remove tiles.`);
+      return;
+    }
+
+    // Fisher–Yates partial shuffle: pick `totalTiles` unique pairs.
+    for (let i = 0; i < totalTiles; i++) {
+      const j = i + Math.floor(Math.random() * (pairs.length - i));
+      [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+    }
+    let k = 0;
+    state.stages.forEach(s => s.tiles.forEach(t => {
+      const p = pairs[k++];
+      t.categoryId = p.categoryId;
+      t.wordId = p.wordId;
+    }));
+    state.categories = data;
+    // Leftover pairs (more pairs than tiles) flow into stock as plain strings.
+    // Each entry is the pair's wordId — which is the categoryId for self-pairs
+    // and the word itself for wordsIds entries.
+    state.stock = pairs.slice(totalTiles).map(p => p.wordId);
+    render();
+  } catch (err) {
+    alert('Failed to apply categories: ' + err.message);
+  } finally {
+    e.target.value = '';
+  }
+});
+
+el('randomizeWordIds').addEventListener('click', () => {
+  const totalTiles = state.stages.reduce((n, s) => n + s.tiles.length, 0);
+  if (totalTiles === 0) { alert('No tiles to randomize.'); return; }
+  if (totalTiles > 200) {
+    alert(`Cannot assign unique values from 1–200: there are ${totalTiles} tiles. Reduce tile count or widen the range.`);
+    return;
+  }
+  // Fisher–Yates partial shuffle: pick `totalTiles` unique values from 1..200.
+  const pool = Array.from({ length: 200 }, (_, i) => i + 1);
+  for (let i = 0; i < totalTiles; i++) {
+    const j = i + Math.floor(Math.random() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  let k = 0;
+  state.stages.forEach(s => s.tiles.forEach(t => { t.wordId = String(pool[k++]); }));
+  render();
+});
+
+el('brushCategoryId').addEventListener('input', (e) => {
+  state.brush.categoryId = e.target.value;
+  el('brushSwatch').style.background = colorFor(state.brush.categoryId).bg;
+  // Refresh chip "active" state.
+  document.querySelectorAll('#catList .cat-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.textContent === state.brush.categoryId);
+  });
+});
+el('brushWordId').addEventListener('input', (e) => { state.brush.wordId = e.target.value; });
+
+el('selCategoryId').addEventListener('input', (e) => {
+  const t = selectedTile(); if (!t) return;
+  t.categoryId = e.target.value;
+  renderBoard();
+  // Refresh chip list (a new categoryId may now exist or be gone).
+  // Defer to next tick so the input keeps focus through the re-render.
+  setTimeout(renderSidebar, 0);
+});
+el('selWordId').addEventListener('input', (e) => {
+  const t = selectedTile(); if (!t) return;
+  t.wordId = e.target.value;
+  // Update tile DOM directly to keep focus on the input.
+  const nodes = el('board').querySelectorAll('.tile:not(.ghost)');
+  const node = nodes[state.selectedTileIdx];
+  if (node) {
+    const w = node.querySelector('.word');
+    if (w) w.textContent = t.wordId;
+  }
+});
+el('selX').addEventListener('input', (e) => {
+  const t = selectedTile(); if (!t) return;
+  const v = parseInt(e.target.value);
+  if (Number.isFinite(v) && v >= 0) { t.x = v; renderBoard(); }
+});
+el('selY').addEventListener('input', (e) => {
+  const t = selectedTile(); if (!t) return;
+  const v = parseInt(e.target.value);
+  if (Number.isFinite(v) && v >= 0) { t.y = v; renderBoard(); }
+});
+el('delTile').addEventListener('click', () => {
+  if (state.selectedTileIdx == null) return;
+  currentStage().tiles.splice(state.selectedTileIdx, 1);
+  state.selectedTileIdx = null;
+  render();
+});
+
+el('stageId').addEventListener('input', (e) => {
+  currentStage().stageId = e.target.value;
+  renderStageTabs();
+});
+el('stageZ').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value);
+  if (Number.isFinite(v)) { currentStage().z = v; renderStageTabs(); renderBoard(); }
+});
+el('addStage').addEventListener('click', () => {
+  const maxZ = state.stages.reduce((m, s) => Math.max(m, s.z), -1);
+  const idx = state.stages.length;
+  state.stages.push({ stageId: `stage-${idx + 1}`, z: maxZ + 1, tiles: [] });
+  state.currentStageIdx = idx;
+  state.selectedTileIdx = null;
+  render();
+});
+el('delStage').addEventListener('click', () => {
+  if (state.stages.length === 1) { alert('Cannot delete the last stage.'); return; }
+  if (!confirm(`Delete "${currentStage().stageId}" and all its tiles?`)) return;
+  state.stages.splice(state.currentStageIdx, 1);
+  if (state.currentStageIdx >= state.stages.length) state.currentStageIdx = state.stages.length - 1;
+  state.selectedTileIdx = null;
+  render();
+});
+el('showOthers').addEventListener('change', (e) => {
+  state.showOthers = e.target.checked; renderBoard();
+});
+
+el('gridCols').addEventListener('input', (e) => { state.grid.cols = Math.max(1, parseInt(e.target.value) || 1); renderBoard(); });
+el('gridRows').addEventListener('input', (e) => { state.grid.rows = Math.max(1, parseInt(e.target.value) || 1); renderBoard(); });
+el('gridStep').addEventListener('input', (e) => { state.grid.cellStep = Math.max(1, parseInt(e.target.value) || 1); renderBoard(); });
+
+window.addEventListener('keydown', (e) => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (state.selectedTileIdx != null) {
+      currentStage().tiles.splice(state.selectedTileIdx, 1);
+      state.selectedTileIdx = null;
+      render();
+    }
+  } else if (e.key === 'Escape') {
+    state.selectedTileIdx = null;
+    render();
+  }
+});
+
+el('saveJson').addEventListener('click', () => {
+  const out = {
+    levelId: state.levelId,
+    slotsAmount: state.slotsAmount,
+    movesCount: state.movesCount,
+    stock: state.stock,
+    categories: state.categories,
+    grid: state.grid,
+    stages: state.stages.map(s => ({
+      stageId: s.stageId,
+      z: s.z,
+      tiles: s.tiles.map(t => ({
+        x: t.x, y: t.y,
+        categoryId: t.categoryId,
+        wordId: t.wordId,
+      })),
+    })),
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.levelId || 'level') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+el('loadBtn').addEventListener('click', () => el('loadJson').click());
+el('loadJson').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    state.levelId = data.levelId || 'level-1';
+    state.slotsAmount = Number.isFinite(+data.slotsAmount) ? (+data.slotsAmount) | 0 : 7;
+    state.movesCount = Number.isFinite(+data.movesCount) ? (+data.movesCount) | 0 : 100;
+    state.stock = Array.isArray(data.stock) ? data.stock.map(s => String(s)) : [];
+    state.categories = Array.isArray(data.categories) ? data.categories : [];
+    state.grid = Object.assign({ cols: 24, rows: 18, cellStep: 1 }, data.grid || {});
+    state.stages = Array.isArray(data.stages) && data.stages.length
+      ? data.stages.map((s, i) => ({
+          stageId: s.stageId || `stage-${i + 1}`,
+          z: Number.isFinite(s.z) ? s.z : i,
+          tiles: Array.isArray(s.tiles) ? s.tiles.map(t => ({
+            x: t.x | 0, y: t.y | 0,
+            categoryId: String(t.categoryId ?? ''),
+            wordId: String(t.wordId ?? ''),
+          })) : [],
+        }))
+      : [{ stageId: 'stage-1', z: 0, tiles: [] }];
+    state.currentStageIdx = 0;
+    state.selectedTileIdx = null;
+    el('levelId').value = state.levelId;
+    render();
+  } catch (err) {
+    alert('Failed to parse JSON: ' + err.message);
+  } finally {
+    e.target.value = '';
+  }
+});
+
+render();
+</script>
+</body>
+</html>
