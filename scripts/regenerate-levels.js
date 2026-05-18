@@ -22,7 +22,7 @@ function buildPairsByCategory(categoriesData) {
   return map;
 }
 
-function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
+function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount, boardCapacity) {
   const slots = Math.max(1, slotsAmount | 0);
   const profiles = {
     easy:     { maxOpen: Math.min(2, slots), chunkSize: 1 },
@@ -49,12 +49,38 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
     return { id, queue: [head, ...rest] };
   });
 
-  const sequence = [];
+  const numCats = cats.length;
+  const totalPairs = cats.reduce((n, c) => n + c.queue.length, 0);
+  if (!Number.isFinite(boardCapacity) || boardCapacity <= 0 || boardCapacity >= totalPairs) {
+    for (const cat of cats) cat.boardN = cat.queue.length;
+  } else {
+    const cap = (cat) => Math.max(0, cat.queue.length - 1);
+    const base = Math.floor(boardCapacity / numCats);
+    let allocated = 0;
+    for (const cat of cats) {
+      cat.boardN = Math.min(base, cap(cat));
+      allocated += cat.boardN;
+    }
+    let i = 0;
+    const maxIter = numCats * 100;
+    while (allocated < boardCapacity && i < maxIter) {
+      const cat = cats[i % numCats];
+      if (cat.boardN < cap(cat)) { cat.boardN++; allocated++; }
+      i++;
+    }
+  }
+  for (const cat of cats) {
+    cat.boardQ = cat.queue.slice(0, cat.boardN);
+    cat.stockQ = cat.queue.slice(cat.boardN);
+  }
+
+  const boardSeq = [];
   const active = [];
   let nextCatIdx = 0;
   const refill = () => {
     while (active.length < p.maxOpen && nextCatIdx < cats.length) {
-      active.push(cats[nextCatIdx++]);
+      const c = cats[nextCatIdx++];
+      if (c.boardQ.length > 0) active.push({ id: c.id, queue: c.boardQ.slice() });
     }
   };
   refill();
@@ -62,7 +88,7 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
   let chunkLeft = p.chunkSize;
   while (active.length > 0) {
     const cat = active[activeIdx];
-    sequence.push(cat.queue.shift());
+    boardSeq.push(cat.queue.shift());
     chunkLeft--;
     if (cat.queue.length === 0) {
       active.splice(activeIdx, 1);
@@ -75,33 +101,21 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
       chunkLeft = p.chunkSize;
     }
   }
-  return sequence;
+
+  const stockSeq = [];
+  for (const cat of cats) for (const pair of cat.stockQ) stockSeq.push(pair);
+  for (let i = stockSeq.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [stockSeq[i], stockSeq[j]] = [stockSeq[j], stockSeq[i]];
+  }
+
+  return boardSeq.concat(stockSeq);
 }
 
-function ensureBoardHasAllCategories(sequence, boardCapacity) {
-  if (boardCapacity >= sequence.length) return;
-  const counts = new Map();
-  for (let i = 0; i < boardCapacity; i++) {
-    const c = sequence[i].categoryId;
-    counts.set(c, (counts.get(c) || 0) + 1);
-  }
-  for (let stockIdx = boardCapacity; stockIdx < sequence.length; stockIdx++) {
-    const pair = sequence[stockIdx];
-    if (counts.has(pair.categoryId)) continue;
-    let donorCat = null, donorCount = -1;
-    for (const [c, n] of counts) if (n > donorCount) { donorCat = c; donorCount = n; }
-    if (donorCount < 2) break;
-    for (let boardIdx = boardCapacity - 1; boardIdx >= 0; boardIdx--) {
-      if (sequence[boardIdx].categoryId === donorCat) {
-        const evicted = sequence[boardIdx];
-        sequence[boardIdx] = pair;
-        sequence[stockIdx] = evicted;
-        counts.set(donorCat, donorCount - 1);
-        counts.set(pair.categoryId, 1);
-        break;
-      }
-    }
-  }
+function getBoardCapacity(level) {
+  let n = 0;
+  for (const s of level.stages) n += s.tiles.length;
+  return n;
 }
 
 function assignSequenceToBoardAndStock(level, sequence) {
@@ -118,7 +132,6 @@ function assignSequenceToBoardAndStock(level, sequence) {
   if (totalTiles > sequence.length) {
     throw new Error(`Not enough pairs: ${sequence.length} pairs vs ${totalTiles} tiles.`);
   }
-  ensureBoardHasAllCategories(sequence, totalTiles);
   for (let i = 0; i < totalTiles; i++) {
     const pos = positions[i];
     const p = sequence[i];
@@ -134,7 +147,10 @@ function regenerateLevel(key) {
   const level = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
   const pairsByCat = buildPairsByCategory(level.categories);
   if (pairsByCat.size === 0) throw new Error(`${key}: no usable categories embedded in JSON`);
-  const sequence = buildSequenceByDifficulty(pairsByCat, level.difficulty, level.slotsAmount);
+  const boardCapacity = getBoardCapacity(level);
+  const sequence = buildSequenceByDifficulty(
+    pairsByCat, level.difficulty, level.slotsAmount, boardCapacity
+  );
   level.stock = assignSequenceToBoardAndStock(level, sequence);
 
   const jsonText = JSON.stringify(level, null, 2);
@@ -149,13 +165,24 @@ function regenerateLevel(key) {
     '})();\n';
   fs.writeFileSync(jsPath, jsText, 'utf8');
 
-  const boardTiles = level.stages.reduce((n, s) => n + s.tiles.length, 0);
-  const boardCats = new Set();
-  for (const s of level.stages) for (const t of s.tiles) boardCats.add(t.categoryId);
+  const boardCounts = new Map();
+  for (const s of level.stages) for (const t of s.tiles) {
+    boardCounts.set(t.categoryId, (boardCounts.get(t.categoryId) || 0) + 1);
+  }
+  const stockCounts = new Map();
+  for (const w of level.stock) {
+    let catId = null;
+    for (const c of level.categories) {
+      if (c.categoryId === w || (c.wordsIds || []).includes(w)) { catId = c.categoryId; break; }
+    }
+    if (catId) stockCounts.set(catId, (stockCounts.get(catId) || 0) + 1);
+  }
+  const dist = [...pairsByCat.keys()].map(c =>
+    `${c}=${boardCounts.get(c) || 0}/${stockCounts.get(c) || 0}`
+  ).join(' ');
   console.log(
     `${key}: ${level.difficulty}, slots=${level.slotsAmount}, ` +
-    `board=${boardTiles} (cats: ${boardCats.size}/${pairsByCat.size}), ` +
-    `stock=${level.stock.length}`
+    `board=${boardCapacity}, stock=${level.stock.length}\n  ${dist}`
   );
 }
 

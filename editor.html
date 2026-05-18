@@ -580,16 +580,23 @@ function buildPairsByCategory(categoriesData) {
   return map;
 }
 
-// Order pairs into a play sequence whose interleaving matches the difficulty.
-// `maxOpen` caps how many categories may be "in flight" at once (≈ slots a
-// solver is forced to hold simultaneously). `chunkSize` is how many tiles of
-// the same category are emitted consecutively before rotating to the next
-// active category.
-function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
+function getBoardCapacity() {
+  let n = 0;
+  for (const s of state.stages) n += s.tiles.length;
+  return n;
+}
+
+// Build a play sequence so EVERY category contributes roughly the same number
+// of tiles to the board portion (first `boardCapacity` items). The rest of
+// each category — including some word tiles for cats whose total exceeds the
+// quota — goes to the stock portion. Forces the player to engage with stock
+// to complete every category, not just the late-joining ones.
+//
+// `maxOpen` is the number of categories juggled concurrently in the board
+// portion (difficulty knob). `chunkSize` is how many same-category tiles
+// emit before rotating; uniformly 1 across tiers right now.
+function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount, boardCapacity) {
   const slots = Math.max(1, slotsAmount | 0);
-  // chunkSize is uniformly 1 across tiers — categories always rotate by 1
-  // tile. Difficulty grades by maxOpen (how many categories are juggled
-  // concurrently): 2 / 4 / 6 / all-slots.
   const profiles = {
     easy:     { maxOpen: Math.min(2, slots), chunkSize: 1 },
     normal:   { maxOpen: Math.min(4, slots), chunkSize: 1 },
@@ -604,7 +611,8 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
     [catIds[i], catIds[j]] = [catIds[j], catIds[i]];
   }
 
-  // Self-pair stays at index 0; words are shuffled among themselves.
+  // Self-pair (head) stays at queue[0]; words are shuffled among themselves.
+  // The head is always the first tile the cat emits, so it lands on the board.
   const cats = catIds.map(id => {
     const all = pairsByCat.get(id).slice();
     const head = all[0];
@@ -616,12 +624,45 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
     return { id, queue: [head, ...rest] };
   });
 
-  const sequence = [];
+  // Even-allocation: each cat gets ~floor(capacity / numCats) tiles on board.
+  // CRITICAL: every cat's board allocation is capped at (queue.length - 1),
+  // so at least one tile of every category lands in stock — the player can
+  // never complete any category purely from the board. The remainder is
+  // distributed round-robin to cats that still have room under the cap.
+  const numCats = cats.length;
+  const totalPairs = cats.reduce((n, c) => n + c.queue.length, 0);
+  if (!Number.isFinite(boardCapacity) || boardCapacity <= 0 || boardCapacity >= totalPairs) {
+    for (const cat of cats) cat.boardN = cat.queue.length;
+  } else {
+    const cap = (cat) => Math.max(0, cat.queue.length - 1);
+    const base = Math.floor(boardCapacity / numCats);
+    let allocated = 0;
+    for (const cat of cats) {
+      cat.boardN = Math.min(base, cap(cat));
+      allocated += cat.boardN;
+    }
+    let i = 0;
+    const maxIter = numCats * 100;
+    while (allocated < boardCapacity && i < maxIter) {
+      const cat = cats[i % numCats];
+      if (cat.boardN < cap(cat)) { cat.boardN++; allocated++; }
+      i++;
+    }
+  }
+  for (const cat of cats) {
+    cat.boardQ = cat.queue.slice(0, cat.boardN);
+    cat.stockQ = cat.queue.slice(cat.boardN);
+  }
+
+  // Interleave the BOARD portion using maxOpen/chunkSize. Cats with empty
+  // boardQ are skipped (they're fully in stock).
+  const boardSeq = [];
   const active = [];
   let nextCatIdx = 0;
   const refill = () => {
     while (active.length < p.maxOpen && nextCatIdx < cats.length) {
-      active.push(cats[nextCatIdx++]);
+      const c = cats[nextCatIdx++];
+      if (c.boardQ.length > 0) active.push({ id: c.id, queue: c.boardQ.slice() });
     }
   };
   refill();
@@ -629,7 +670,7 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
   let chunkLeft = p.chunkSize;
   while (active.length > 0) {
     const cat = active[activeIdx];
-    sequence.push(cat.queue.shift());
+    boardSeq.push(cat.queue.shift());
     chunkLeft--;
     if (cat.queue.length === 0) {
       active.splice(activeIdx, 1);
@@ -642,42 +683,17 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
       chunkLeft = p.chunkSize;
     }
   }
-  return sequence;
-}
 
-// Guarantee every category has at least one tile on the board portion
-// (first `boardCapacity` items of `sequence`). Without this, late-joining
-// categories can land entirely in stock — letting the player complete those
-// categories just by flipping stock, which feels wrong.
-//
-// Strategy: for each missing category's pair in stock (earliest first — that's
-// usually the category-head/joker), swap it with the latest board occurrence
-// of the most over-represented category. Bails out once no donor category
-// has more than one tile to give up.
-function ensureBoardHasAllCategories(sequence, boardCapacity) {
-  if (boardCapacity >= sequence.length) return;
-  const counts = new Map();
-  for (let i = 0; i < boardCapacity; i++) {
-    const c = sequence[i].categoryId;
-    counts.set(c, (counts.get(c) || 0) + 1);
+  // Shuffle the STOCK portion (leftover from each cat). Order in stock is
+  // unpredictable for the player so randomness > preserving cat order.
+  const stockSeq = [];
+  for (const cat of cats) for (const pair of cat.stockQ) stockSeq.push(pair);
+  for (let i = stockSeq.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [stockSeq[i], stockSeq[j]] = [stockSeq[j], stockSeq[i]];
   }
-  for (let stockIdx = boardCapacity; stockIdx < sequence.length; stockIdx++) {
-    const pair = sequence[stockIdx];
-    if (counts.has(pair.categoryId)) continue;
-    let donorCat = null, donorCount = -1;
-    for (const [c, n] of counts) if (n > donorCount) { donorCat = c; donorCount = n; }
-    if (donorCount < 2) break;
-    for (let boardIdx = boardCapacity - 1; boardIdx >= 0; boardIdx--) {
-      if (sequence[boardIdx].categoryId === donorCat) {
-        const evicted = sequence[boardIdx];
-        sequence[boardIdx] = pair;
-        sequence[stockIdx] = evicted;
-        counts.set(donorCat, donorCount - 1);
-        counts.set(pair.categoryId, 1);
-        break;
-      }
-    }
-  }
+
+  return boardSeq.concat(stockSeq);
 }
 
 // Push `sequence` onto the board, in an order that lines up with how the
@@ -700,7 +716,6 @@ function assignSequenceToBoardAndStock(sequence) {
     alert(`Not enough unique pairs: ${sequence.length} pairs vs ${totalTiles} tiles. Add more categories/words or remove tiles.`);
     return false;
   }
-  ensureBoardHasAllCategories(sequence, totalTiles);
   for (let i = 0; i < totalTiles; i++) {
     const pos = positions[i];
     const p = sequence[i];
@@ -724,7 +739,7 @@ el('applyCategoriesFile').addEventListener('change', async (e) => {
     const pairsByCat = buildPairsByCategory(data);
     if (pairsByCat.size === 0) throw new Error('No (categoryId, wordId) pairs found in file.');
     state.categories = data;
-    const sequence = buildSequenceByDifficulty(pairsByCat, state.difficulty, state.slotsAmount);
+    const sequence = buildSequenceByDifficulty(pairsByCat, state.difficulty, state.slotsAmount, getBoardCapacity());
     if (!assignSequenceToBoardAndStock(sequence)) return;
     render();
   } catch (err) {
@@ -744,7 +759,7 @@ el('applyDifficultyBtn').addEventListener('click', () => {
     alert('Loaded categories have no usable entries.');
     return;
   }
-  const sequence = buildSequenceByDifficulty(pairsByCat, state.difficulty, state.slotsAmount);
+  const sequence = buildSequenceByDifficulty(pairsByCat, state.difficulty, state.slotsAmount, getBoardCapacity());
   if (!assignSequenceToBoardAndStock(sequence)) return;
   render();
 });
