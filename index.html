@@ -410,8 +410,8 @@
   </div>
 
   <!-- Sidecar level for file:// (where fetch is blocked). HTTP loads still prefer
-       fetching levels/level_1.json directly so editor edits show up immediately. -->
-  <script src="levels/level_1.js"></script>
+       fetching levels/level-1.json directly so editor edits show up immediately. -->
+  <script src="levels/level-1.js"></script>
 <script>
 'use strict';
 
@@ -1164,7 +1164,7 @@ el('loadJson').addEventListener('change', async (e) => {
 async function loadDefault() {
   if (location.protocol !== 'file:') {
     try {
-      const resp = await fetch('levels/level_1.json', { cache: 'no-store' });
+      const resp = await fetch('levels/level-1.json', { cache: 'no-store' });
       if (resp.ok) { initGame(await resp.json()); return; }
     } catch (_) { /* fall through */ }
   }
@@ -1176,8 +1176,8 @@ async function loadDefault() {
   } else {
     document.body.innerHTML =
       '<div style="padding:20px;color:#f87171;font-family:system-ui">' +
-      'No level data found. Make sure <code>levels/level_1.js</code> ' +
-      '(for file://) or <code>levels/level_1.json</code> (over HTTP) is reachable.' +
+      'No level data found. Make sure <code>levels/level-1.js</code> ' +
+      '(for file://) or <code>levels/level-1.json</code> (over HTTP) is reachable.' +
       '</div>';
   }
 }

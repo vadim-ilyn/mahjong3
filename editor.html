@@ -164,10 +164,23 @@
         <h3>Level config</h3>
         <label>slotsAmount <input type="number" id="cfgSlotsAmount" min="0" value="7"></label>
         <label>movesCount <input type="number" id="cfgMovesCount" min="0" value="100"></label>
+        <label>difficulty
+          <select id="cfgDifficulty">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+            <option value="veryhard">Very hard</option>
+          </select>
+        </label>
+        <div class="hint" style="margin-bottom: 8px;">
+          Controls how many categories must be "open" in slots at once.
+          Easy = one at a time. Very hard = all <span id="diffSlotsHint">7</span> slots in use.
+          Applied when you press <em>Apply categories</em> or <em>Re-apply with current difficulty</em>.
+        </div>
         <label>stock (one entry per line)
           <textarea id="cfgStock" rows="4" style="width:100%; padding:5px 8px; border:1px solid #d4d4d8; border-radius:4px; font:inherit; margin-top:2px; resize:vertical;"></textarea>
         </label>
-        <div class="hint">These three fields are saved at the level root of the exported JSON.</div>
+        <div class="hint">These fields are saved at the level root of the exported JSON.</div>
       </section>
 
       <section>
@@ -191,7 +204,9 @@
         <div class="hint" style="margin-bottom: 10px;">Assigns every tile across all stages a unique random integer from 1 to 200.</div>
         <button id="applyCategoriesBtn">Apply categories from JSON…</button>
         <input type="file" id="applyCategoriesFile" accept=".json,application/json" hidden>
-        <div class="hint">Pick a categories file (e.g. <code>categories_set_1.json</code>). For each category it builds pairs <code>{cat, cat}</code> then <code>{cat, word}</code> for every word, shuffles them, and assigns one pair per tile.</div>
+        <div class="hint" style="margin-bottom: 10px;">Pick a categories file (e.g. <code>categories_set_1.json</code>). For each category it builds pairs <code>{cat, cat}</code> then <code>{cat, word}</code> for every word, then arranges them according to the chosen difficulty.</div>
+        <button id="applyDifficultyBtn">Re-apply with current difficulty</button>
+        <div class="hint">Re-arranges existing tiles/stock using the categories loaded earlier — no need to re-pick the file just to change difficulty.</div>
       </section>
 
       <section id="selPanel" hidden>
@@ -283,6 +298,7 @@ const state = {
   levelId: 'level-1',
   slotsAmount: 7,
   movesCount: 100,
+  difficulty: 'normal',
   stock: [],
   categories: [],
   grid: { cols: 24, rows: 18, cellStep: 1 },
@@ -408,6 +424,8 @@ function renderSidebar() {
 
   el('cfgSlotsAmount').value = state.slotsAmount;
   el('cfgMovesCount').value = state.movesCount;
+  el('cfgDifficulty').value = state.difficulty;
+  el('diffSlotsHint').textContent = String(Math.max(1, state.slotsAmount | 0));
   // Don't overwrite the textarea while the user is typing in it.
   if (document.activeElement !== el('cfgStock')) {
     el('cfgStock').value = state.stock.join('\n');
@@ -543,6 +561,119 @@ el('cfgMovesCount').addEventListener('input', (e) => {
 el('cfgStock').addEventListener('input', (e) => {
   state.stock = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
 });
+el('cfgDifficulty').addEventListener('change', (e) => {
+  state.difficulty = e.target.value;
+});
+
+// Build a Map<categoryId, [{categoryId, wordId}, ...]> from a categories array.
+// Each list starts with the self-pair (categoryId, categoryId) — the joker /
+// category tile — so it's guaranteed to be drawn before any of the words.
+function buildPairsByCategory(categoriesData) {
+  const map = new Map();
+  for (const c of (categoriesData || [])) {
+    if (!c || typeof c.categoryId !== 'string') continue;
+    const arr = [{ categoryId: c.categoryId, wordId: c.categoryId }];
+    const words = Array.isArray(c.wordsIds) ? c.wordsIds : [];
+    for (const w of words) arr.push({ categoryId: c.categoryId, wordId: String(w) });
+    map.set(c.categoryId, arr);
+  }
+  return map;
+}
+
+// Order pairs into a play sequence whose interleaving matches the difficulty.
+// `maxOpen` caps how many categories may be "in flight" at once (≈ slots a
+// solver is forced to hold simultaneously). `chunkSize` is how many tiles of
+// the same category are emitted consecutively before rotating to the next
+// active category.
+function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
+  const slots = Math.max(1, slotsAmount | 0);
+  const profiles = {
+    easy:     { maxOpen: 1,                 chunkSize: Infinity },
+    normal:   { maxOpen: Math.min(3, slots), chunkSize: 3 },
+    hard:     { maxOpen: Math.min(5, slots), chunkSize: 2 },
+    veryhard: { maxOpen: slots,              chunkSize: 1 },
+  };
+  const p = profiles[difficulty] || profiles.normal;
+
+  const catIds = Array.from(pairsByCat.keys());
+  for (let i = catIds.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [catIds[i], catIds[j]] = [catIds[j], catIds[i]];
+  }
+
+  // Self-pair stays at index 0; words are shuffled among themselves.
+  const cats = catIds.map(id => {
+    const all = pairsByCat.get(id).slice();
+    const head = all[0];
+    const rest = all.slice(1);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    return { id, queue: [head, ...rest] };
+  });
+
+  const sequence = [];
+  const active = [];
+  let nextCatIdx = 0;
+  const refill = () => {
+    while (active.length < p.maxOpen && nextCatIdx < cats.length) {
+      active.push(cats[nextCatIdx++]);
+    }
+  };
+  refill();
+  let activeIdx = 0;
+  let chunkLeft = p.chunkSize;
+  while (active.length > 0) {
+    const cat = active[activeIdx];
+    sequence.push(cat.queue.shift());
+    chunkLeft--;
+    if (cat.queue.length === 0) {
+      active.splice(activeIdx, 1);
+      refill();
+      if (active.length === 0) break;
+      if (activeIdx >= active.length) activeIdx = 0;
+      chunkLeft = p.chunkSize;
+    } else if (chunkLeft <= 0) {
+      activeIdx = (activeIdx + 1) % active.length;
+      chunkLeft = p.chunkSize;
+    }
+  }
+  return sequence;
+}
+
+// Push `sequence` onto the board, in an order that lines up with how the
+// player will actually encounter tiles: top stages first (highest z is
+// playable immediately), then within each stage top-to-bottom, left-to-right.
+// Anything left over after the board is full becomes the stock deck.
+function assignSequenceToBoardAndStock(sequence) {
+  const positions = [];
+  state.stages.forEach((stage, sIdx) => {
+    stage.tiles.forEach((_, tIdx) => {
+      const t = stage.tiles[tIdx];
+      positions.push({ sIdx, tIdx, z: stage.z, x: t.x, y: t.y });
+    });
+  });
+  positions.sort((a, b) => (b.z - a.z) || (a.y - b.y) || (a.x - b.x));
+
+  const totalTiles = positions.length;
+  if (totalTiles === 0) { alert('No tiles on the board to apply pairs to.'); return false; }
+  if (totalTiles > sequence.length) {
+    alert(`Not enough unique pairs: ${sequence.length} pairs vs ${totalTiles} tiles. Add more categories/words or remove tiles.`);
+    return false;
+  }
+  for (let i = 0; i < totalTiles; i++) {
+    const pos = positions[i];
+    const p = sequence[i];
+    const t = state.stages[pos.sIdx].tiles[pos.tIdx];
+    t.categoryId = p.categoryId;
+    t.wordId = p.wordId;
+  }
+  // Leftover pairs flow into stock as plain strings. The stock deck is drawn
+  // from index 0, so leftover[0] = first card the player flips.
+  state.stock = sequence.slice(totalTiles).map(p => p.wordId);
+  return true;
+}
 
 el('applyCategoriesBtn').addEventListener('click', () => el('applyCategoriesFile').click());
 el('applyCategoriesFile').addEventListener('change', async (e) => {
@@ -551,45 +682,32 @@ el('applyCategoriesFile').addEventListener('change', async (e) => {
   try {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data)) throw new Error('Top-level JSON must be an array of categories.');
-
-    const pairs = [];
-    for (const c of data) {
-      if (!c || typeof c.categoryId !== 'string') continue;
-      pairs.push({ categoryId: c.categoryId, wordId: c.categoryId });
-      const words = Array.isArray(c.wordsIds) ? c.wordsIds : [];
-      for (const w of words) pairs.push({ categoryId: c.categoryId, wordId: String(w) });
-    }
-    if (pairs.length === 0) throw new Error('No (categoryId, wordId) pairs found in file.');
-
-    const totalTiles = state.stages.reduce((n, s) => n + s.tiles.length, 0);
-    if (totalTiles === 0) { alert('No tiles on the board to apply pairs to.'); return; }
-    if (totalTiles > pairs.length) {
-      alert(`Not enough unique pairs: ${pairs.length} pairs vs ${totalTiles} tiles. Add more categories/words or remove tiles.`);
-      return;
-    }
-
-    // Fisher–Yates partial shuffle: pick `totalTiles` unique pairs.
-    for (let i = 0; i < totalTiles; i++) {
-      const j = i + Math.floor(Math.random() * (pairs.length - i));
-      [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
-    }
-    let k = 0;
-    state.stages.forEach(s => s.tiles.forEach(t => {
-      const p = pairs[k++];
-      t.categoryId = p.categoryId;
-      t.wordId = p.wordId;
-    }));
+    const pairsByCat = buildPairsByCategory(data);
+    if (pairsByCat.size === 0) throw new Error('No (categoryId, wordId) pairs found in file.');
     state.categories = data;
-    // Leftover pairs (more pairs than tiles) flow into stock as plain strings.
-    // Each entry is the pair's wordId — which is the categoryId for self-pairs
-    // and the word itself for wordsIds entries.
-    state.stock = pairs.slice(totalTiles).map(p => p.wordId);
+    const sequence = buildSequenceByDifficulty(pairsByCat, state.difficulty, state.slotsAmount);
+    if (!assignSequenceToBoardAndStock(sequence)) return;
     render();
   } catch (err) {
     alert('Failed to apply categories: ' + err.message);
   } finally {
     e.target.value = '';
   }
+});
+
+el('applyDifficultyBtn').addEventListener('click', () => {
+  if (!Array.isArray(state.categories) || state.categories.length === 0) {
+    alert('No categories loaded yet. Click "Apply categories from JSON…" first.');
+    return;
+  }
+  const pairsByCat = buildPairsByCategory(state.categories);
+  if (pairsByCat.size === 0) {
+    alert('Loaded categories have no usable entries.');
+    return;
+  }
+  const sequence = buildSequenceByDifficulty(pairsByCat, state.difficulty, state.slotsAmount);
+  if (!assignSequenceToBoardAndStock(sequence)) return;
+  render();
 });
 
 el('randomizeWordIds').addEventListener('click', () => {
@@ -718,6 +836,7 @@ el('saveJson').addEventListener('click', () => {
     levelId: state.levelId,
     slotsAmount: state.slotsAmount,
     movesCount: state.movesCount,
+    difficulty: state.difficulty,
     stock: state.stock,
     categories: state.categories,
     grid: state.grid,
@@ -756,6 +875,8 @@ el('loadJson').addEventListener('change', async (e) => {
     state.levelId = data.levelId || 'level-1';
     state.slotsAmount = Number.isFinite(+data.slotsAmount) ? (+data.slotsAmount) | 0 : 7;
     state.movesCount = Number.isFinite(+data.movesCount) ? (+data.movesCount) | 0 : 100;
+    state.difficulty = ['easy', 'normal', 'hard', 'veryhard'].includes(data.difficulty)
+      ? data.difficulty : 'normal';
     state.stock = Array.isArray(data.stock) ? data.stock.map(s => String(s)) : [];
     state.categories = Array.isArray(data.categories) ? data.categories : [];
     state.grid = Object.assign({ cols: 24, rows: 18, cellStep: 1 }, data.grid || {});
