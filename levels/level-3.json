@@ -1,7 +1,7 @@
 {
   "levelId": "level-3",
   "slotsAmount": 6,
-  "movesCount": 150,
+  "movesCount": 105,
   "difficulty": "hard",
   "stock": [
     "Comet",
