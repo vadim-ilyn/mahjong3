@@ -25,10 +25,10 @@ function buildPairsByCategory(categoriesData) {
 function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount, boardCapacity) {
   const slots = Math.max(1, slotsAmount | 0);
   const profiles = {
-    easy:     { maxOpen: Math.min(2, slots), chunkSize: 1 },
-    normal:   { maxOpen: Math.min(4, slots), chunkSize: 1 },
-    hard:     { maxOpen: Math.min(6, slots), chunkSize: 1 },
-    veryhard: { maxOpen: slots,              chunkSize: 1 },
+    easy:     { maxOpen: Math.min(2, slots), chunkSize: 1, jokerDeferRatio: 0    },
+    normal:   { maxOpen: Math.min(4, slots), chunkSize: 1, jokerDeferRatio: 0.2  },
+    hard:     { maxOpen: Math.min(6, slots), chunkSize: 1, jokerDeferRatio: 0.45 },
+    veryhard: { maxOpen: slots,              chunkSize: 1, jokerDeferRatio: 0.7  },
   };
   const p = profiles[difficulty] || profiles.normal;
 
@@ -38,15 +38,18 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount, boardCap
     [catIds[i], catIds[j]] = [catIds[j], catIds[i]];
   }
 
-  const cats = catIds.map(id => {
+  const numDeferred = Math.floor(catIds.length * p.jokerDeferRatio);
+  const cats = catIds.map((id, idx) => {
     const all = pairsByCat.get(id).slice();
     const head = all[0];
-    const rest = all.slice(1);
-    for (let i = rest.length - 1; i > 0; i--) {
+    const words = all.slice(1);
+    for (let i = words.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [rest[i], rest[j]] = [rest[j], rest[i]];
+      [words[i], words[j]] = [words[j], words[i]];
     }
-    return { id, queue: [head, ...rest] };
+    const deferred = idx < numDeferred;
+    const queue = deferred ? words.slice() : [head, ...words];
+    return { id, head, words, deferred, queue };
   });
 
   const numCats = cats.length;
@@ -72,6 +75,7 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount, boardCap
   for (const cat of cats) {
     cat.boardQ = cat.queue.slice(0, cat.boardN);
     cat.stockQ = cat.queue.slice(cat.boardN);
+    if (cat.deferred) cat.stockQ.unshift(cat.head);
   }
 
   const boardSeq = [];
