@@ -1,7 +1,7 @@
 {
   "levelId": "level-1",
   "slotsAmount": 6,
-  "movesCount": 130,
+  "movesCount": 150,
   "difficulty": "easy",
   "stock": [
     "Genius",

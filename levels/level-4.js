@@ -5,7 +5,7 @@
   window.MAHJONG_LEVELS["level-4"] = {
   "levelId": "level-4",
   "slotsAmount": 6,
-  "movesCount": 100,
+  "movesCount": 150,
   "difficulty": "veryhard",
   "stock": [
     "Panorama",
