@@ -587,10 +587,13 @@ function buildPairsByCategory(categoriesData) {
 // active category.
 function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
   const slots = Math.max(1, slotsAmount | 0);
+  // chunkSize is uniformly 1 across tiers — categories always rotate by 1
+  // tile. Difficulty grades by maxOpen (how many categories are juggled
+  // concurrently): 2 / 4 / 6 / all-slots.
   const profiles = {
-    easy:     { maxOpen: 1,                 chunkSize: Infinity },
-    normal:   { maxOpen: Math.min(3, slots), chunkSize: 3 },
-    hard:     { maxOpen: Math.min(5, slots), chunkSize: 2 },
+    easy:     { maxOpen: Math.min(2, slots), chunkSize: 1 },
+    normal:   { maxOpen: Math.min(4, slots), chunkSize: 1 },
+    hard:     { maxOpen: Math.min(6, slots), chunkSize: 1 },
     veryhard: { maxOpen: slots,              chunkSize: 1 },
   };
   const p = profiles[difficulty] || profiles.normal;
@@ -642,6 +645,41 @@ function buildSequenceByDifficulty(pairsByCat, difficulty, slotsAmount) {
   return sequence;
 }
 
+// Guarantee every category has at least one tile on the board portion
+// (first `boardCapacity` items of `sequence`). Without this, late-joining
+// categories can land entirely in stock — letting the player complete those
+// categories just by flipping stock, which feels wrong.
+//
+// Strategy: for each missing category's pair in stock (earliest first — that's
+// usually the category-head/joker), swap it with the latest board occurrence
+// of the most over-represented category. Bails out once no donor category
+// has more than one tile to give up.
+function ensureBoardHasAllCategories(sequence, boardCapacity) {
+  if (boardCapacity >= sequence.length) return;
+  const counts = new Map();
+  for (let i = 0; i < boardCapacity; i++) {
+    const c = sequence[i].categoryId;
+    counts.set(c, (counts.get(c) || 0) + 1);
+  }
+  for (let stockIdx = boardCapacity; stockIdx < sequence.length; stockIdx++) {
+    const pair = sequence[stockIdx];
+    if (counts.has(pair.categoryId)) continue;
+    let donorCat = null, donorCount = -1;
+    for (const [c, n] of counts) if (n > donorCount) { donorCat = c; donorCount = n; }
+    if (donorCount < 2) break;
+    for (let boardIdx = boardCapacity - 1; boardIdx >= 0; boardIdx--) {
+      if (sequence[boardIdx].categoryId === donorCat) {
+        const evicted = sequence[boardIdx];
+        sequence[boardIdx] = pair;
+        sequence[stockIdx] = evicted;
+        counts.set(donorCat, donorCount - 1);
+        counts.set(pair.categoryId, 1);
+        break;
+      }
+    }
+  }
+}
+
 // Push `sequence` onto the board, in an order that lines up with how the
 // player will actually encounter tiles: top stages first (highest z is
 // playable immediately), then within each stage top-to-bottom, left-to-right.
@@ -662,6 +700,7 @@ function assignSequenceToBoardAndStock(sequence) {
     alert(`Not enough unique pairs: ${sequence.length} pairs vs ${totalTiles} tiles. Add more categories/words or remove tiles.`);
     return false;
   }
+  ensureBoardHasAllCategories(sequence, totalTiles);
   for (let i = 0; i < totalTiles; i++) {
     const pos = positions[i];
     const p = sequence[i];

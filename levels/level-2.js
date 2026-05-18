@@ -1,4 +1,4 @@
-// Auto-generated alongside level-1.json by editor.html.
+// Auto-generated alongside level-2.json by editor.html.
 // Regenerated whenever you press "Download JSON + JS".
 (function () {
   if (!window.MAHJONG_LEVELS) window.MAHJONG_LEVELS = {};
@@ -8,30 +8,30 @@
   "movesCount": 150,
   "difficulty": "normal",
   "stock": [
-    "Star",
-    "Comet",
-    "Mythos",
-    "Chimera",
-    "Cyclops",
-    "Salsa",
-    "Waltz",
-    "Samba",
-    "Pulsar",
-    "Asteroid",
-    "Meteor",
-    "Gorgon",
-    "Basilisk",
-    "Expert",
-    "Master",
+    "Nova",
+    "Rings",
+    "Panorama",
     "Virtuoso",
-    "Elements",
-    "Earth",
-    "Air",
-    "Genius",
-    "Maestro",
-    "Guru",
+    "Bering",
+    "Cancan",
+    "Cluster",
+    "Selfie",
+    "Celtic",
+    "Fire",
+    "Heart pendant",
+    "Adriatic",
     "Water",
-    "Fire"
+    "Blue gem ring",
+    "Arctic",
+    "Earth",
+    "Blue gem pendant",
+    "Indian",
+    "Air",
+    "Pearl bracelet",
+    "Atlantic",
+    "Blue earrings",
+    "Pacific",
+    "Southern"
   ],
   "categories": [
     {
@@ -183,50 +183,50 @@
         {
           "x": 31,
           "y": 16,
-          "categoryId": "Astro",
-          "wordId": "Astro"
+          "categoryId": "Dances",
+          "wordId": "Waltz"
         },
         {
           "x": 35,
           "y": 16,
-          "categoryId": "Astro",
-          "wordId": "Nova"
+          "categoryId": "Wedding",
+          "wordId": "Proposal"
         },
         {
           "x": 39,
           "y": 28,
-          "categoryId": "Astro",
-          "wordId": "Cluster"
+          "categoryId": "Expert",
+          "wordId": "Master"
         },
         {
           "x": 31,
           "y": 28,
-          "categoryId": "Dances",
-          "wordId": "Polka"
+          "categoryId": "Wedding",
+          "wordId": "Vows"
         },
         {
           "x": 35,
           "y": 28,
-          "categoryId": "Dances",
-          "wordId": "Foxtrot"
+          "categoryId": "Photos",
+          "wordId": "Closeup"
         },
         {
           "x": 39,
           "y": 22,
-          "categoryId": "Dances",
-          "wordId": "Rumba"
+          "categoryId": "Elements",
+          "wordId": "Elements"
         },
         {
           "x": 31,
           "y": 22,
-          "categoryId": "Fabrics",
-          "wordId": "Velvet"
+          "categoryId": "Expert",
+          "wordId": "Maestro"
         },
         {
           "x": 39,
           "y": 16,
-          "categoryId": "Astro",
-          "wordId": "Planet"
+          "categoryId": "Photos",
+          "wordId": "Headshot"
         }
       ]
     },
@@ -237,74 +237,74 @@
         {
           "x": 29,
           "y": 13,
-          "categoryId": "Hats",
-          "wordId": "Fedora hat"
+          "categoryId": "Dances",
+          "wordId": "Samba"
         },
         {
           "x": 41,
           "y": 13,
-          "categoryId": "Jewelry",
-          "wordId": "Blue gem pendant"
+          "categoryId": "Expert",
+          "wordId": "Expert"
         },
         {
           "x": 33,
           "y": 13,
-          "categoryId": "Hats",
-          "wordId": "Winter hat"
+          "categoryId": "Wedding",
+          "wordId": "Veil"
         },
         {
           "x": 41,
           "y": 25,
-          "categoryId": "Fabrics",
-          "wordId": "Linen"
+          "categoryId": "Expert",
+          "wordId": "Guru"
         },
         {
           "x": 41,
           "y": 19,
-          "categoryId": "Jewelry",
-          "wordId": "Pearl bracelet"
+          "categoryId": "Wedding",
+          "wordId": "Groom"
         },
         {
           "x": 37,
           "y": 13,
-          "categoryId": "Hats",
-          "wordId": "Pink wide hat"
+          "categoryId": "Photos",
+          "wordId": "Polaroid"
         },
         {
           "x": 41,
           "y": 31,
+          "categoryId": "Expert",
+          "wordId": "Genius"
+        },
+        {
+          "x": 37,
+          "y": 31,
+          "categoryId": "Photos",
+          "wordId": "Image"
+        },
+        {
+          "x": 29,
+          "y": 19,
           "categoryId": "Dances",
           "wordId": "Tango"
         },
         {
-          "x": 37,
-          "y": 31,
-          "categoryId": "Dances",
-          "wordId": "Cancan"
-        },
-        {
-          "x": 29,
-          "y": 19,
-          "categoryId": "Jewelry",
-          "wordId": "Heart pendant"
-        },
-        {
           "x": 33,
           "y": 31,
-          "categoryId": "Dances",
-          "wordId": "Dances"
+          "categoryId": "Wedding",
+          "wordId": "Ceremony"
         },
         {
           "x": 29,
           "y": 31,
-          "categoryId": "Fabrics",
-          "wordId": "Flannel"
+          "categoryId": "Dances",
+          "wordId": "Foxtrot"
         },
         {
           "x": 29,
           "y": 25,
-          "categoryId": "Fabrics",
-          "wordId": "Silk"
+          "categoryId": "Photos",
+          "wordId": "Portrait"
         }
       ]
     },
@@ -315,98 +315,98 @@
         {
           "x": 27,
           "y": 10,
-          "categoryId": "Oceans",
-          "wordId": "Southern"
+          "categoryId": "Dances",
+          "wordId": "Dances"
         },
         {
           "x": 43,
           "y": 10,
-          "categoryId": "Photos",
-          "wordId": "Polaroid"
+          "categoryId": "Dances",
+          "wordId": "Rumba"
         },
         {
           "x": 27,
           "y": 16,
-          "categoryId": "Photos",
-          "wordId": "Panorama"
+          "categoryId": "Wedding",
+          "wordId": "Wedding"
         },
         {
           "x": 35,
           "y": 10,
-          "categoryId": "Wedding",
-          "wordId": "Rings"
-        },
-        {
-          "x": 31,
-          "y": 10,
-          "categoryId": "Wedding",
-          "wordId": "Bride"
-        },
-        {
-          "x": 39,
-          "y": 10,
-          "categoryId": "Wedding",
-          "wordId": "Vows"
-        },
-        {
-          "x": 27,
-          "y": 22,
-          "categoryId": "Hats",
-          "wordId": "Hats"
-        },
-        {
-          "x": 39,
-          "y": 34,
           "categoryId": "Fabrics",
           "wordId": "Cotton"
         },
         {
           "x": 31,
-          "y": 34,
-          "categoryId": "Jewelry",
-          "wordId": "Blue earrings"
+          "y": 10,
+          "categoryId": "Astro",
+          "wordId": "Pulsar"
         },
         {
-          "x": 27,
-          "y": 34,
-          "categoryId": "Jewelry",
-          "wordId": "Blue gem ring"
-        },
-        {
-          "x": 27,
-          "y": 28,
+          "x": 39,
+          "y": 10,
           "categoryId": "Hats",
           "wordId": "Captain hat"
         },
         {
-          "x": 35,
-          "y": 34,
-          "categoryId": "Fabrics",
-          "wordId": "Fabrics"
-        },
-        {
-          "x": 43,
-          "y": 16,
-          "categoryId": "Photos",
-          "wordId": "Snapshot"
-        },
-        {
-          "x": 43,
+          "x": 27,
           "y": 22,
-          "categoryId": "Hats",
-          "wordId": "Red star cap"
-        },
-        {
-          "x": 43,
-          "y": 34,
           "categoryId": "Fabrics",
           "wordId": "Satin"
         },
         {
-          "x": 43,
-          "y": 28,
+          "x": 39,
+          "y": 34,
+          "categoryId": "Photos",
+          "wordId": "Snapshot"
+        },
+        {
+          "x": 31,
+          "y": 34,
+          "categoryId": "Dances",
+          "wordId": "Salsa"
+        },
+        {
+          "x": 27,
+          "y": 34,
           "categoryId": "Jewelry",
           "wordId": "Jewelry"
+        },
+        {
+          "x": 27,
+          "y": 28,
+          "categoryId": "Wedding",
+          "wordId": "Bride"
+        },
+        {
+          "x": 35,
+          "y": 34,
+          "categoryId": "Wedding",
+          "wordId": "Bouquet"
+        },
+        {
+          "x": 43,
+          "y": 16,
+          "categoryId": "Astro",
+          "wordId": "Planet"
+        },
+        {
+          "x": 43,
+          "y": 22,
+          "categoryId": "Dances",
+          "wordId": "Polka"
+        },
+        {
+          "x": 43,
+          "y": 34,
+          "categoryId": "Oceans",
+          "wordId": "Oceans"
+        },
+        {
+          "x": 43,
+          "y": 28,
+          "categoryId": "Photos",
+          "wordId": "Photos"
         }
       ]
     },
@@ -417,122 +417,122 @@
         {
           "x": 29,
           "y": 7,
-          "categoryId": "Oceans",
-          "wordId": "Celtic"
+          "categoryId": "Mythos",
+          "wordId": "Mythos"
         },
         {
           "x": 25,
           "y": 7,
-          "categoryId": "Oceans",
-          "wordId": "Oceans"
+          "categoryId": "Astro",
+          "wordId": "Astro"
         },
         {
           "x": 33,
           "y": 7,
-          "categoryId": "Oceans",
-          "wordId": "Atlantic"
+          "categoryId": "Fabrics",
+          "wordId": "Fabrics"
         },
         {
           "x": 25,
           "y": 13,
-          "categoryId": "Photos",
-          "wordId": "Photos"
+          "categoryId": "Fabrics",
+          "wordId": "Linen"
         },
         {
           "x": 45,
           "y": 7,
-          "categoryId": "Wedding",
-          "wordId": "Bouquet"
+          "categoryId": "Mythos",
+          "wordId": "Basilisk"
         },
         {
           "x": 37,
           "y": 7,
-          "categoryId": "Wedding",
-          "wordId": "Wedding"
+          "categoryId": "Hats",
+          "wordId": "Hats"
         },
         {
           "x": 25,
           "y": 25,
-          "categoryId": "Oceans",
-          "wordId": "Adriatic"
+          "categoryId": "Fabrics",
+          "wordId": "Velvet"
         },
         {
           "x": 25,
           "y": 19,
-          "categoryId": "Photos",
-          "wordId": "Portrait"
+          "categoryId": "Astro",
+          "wordId": "Meteor"
         },
         {
           "x": 41,
           "y": 7,
-          "categoryId": "Wedding",
-          "wordId": "Ceremony"
+          "categoryId": "Astro",
+          "wordId": "Star"
         },
         {
           "x": 45,
           "y": 37,
-          "categoryId": "Oceans",
-          "wordId": "Indian"
+          "categoryId": "Hats",
+          "wordId": "Winter hat"
         },
         {
           "x": 41,
           "y": 37,
-          "categoryId": "Oceans",
-          "wordId": "Bering"
+          "categoryId": "Fabrics",
+          "wordId": "Flannel"
         },
         {
           "x": 37,
           "y": 37,
-          "categoryId": "Photos",
-          "wordId": "Headshot"
+          "categoryId": "Mythos",
+          "wordId": "Chimera"
         },
         {
           "x": 29,
           "y": 37,
-          "categoryId": "Photos",
-          "wordId": "Image"
+          "categoryId": "Hats",
+          "wordId": "Fedora hat"
         },
         {
           "x": 25,
           "y": 37,
-          "categoryId": "Wedding",
-          "wordId": "Veil"
+          "categoryId": "Fabrics",
+          "wordId": "Silk"
         },
         {
           "x": 33,
           "y": 37,
-          "categoryId": "Photos",
-          "wordId": "Selfie"
+          "categoryId": "Astro",
+          "wordId": "Asteroid"
         },
         {
           "x": 25,
           "y": 31,
-          "categoryId": "Wedding",
-          "wordId": "Proposal"
+          "categoryId": "Astro",
+          "wordId": "Comet"
         },
         {
           "x": 45,
           "y": 13,
-          "categoryId": "Photos",
-          "wordId": "Closeup"
+          "categoryId": "Hats",
+          "wordId": "Pink wide hat"
         },
         {
           "x": 45,
           "y": 19,
-          "categoryId": "Oceans",
-          "wordId": "Arctic"
+          "categoryId": "Mythos",
+          "wordId": "Cyclops"
         },
         {
           "x": 45,
           "y": 25,
-          "categoryId": "Oceans",
-          "wordId": "Pacific"
+          "categoryId": "Hats",
+          "wordId": "Red star cap"
         },
         {
           "x": 45,
           "y": 31,
-          "categoryId": "Wedding",
-          "wordId": "Groom"
+          "categoryId": "Mythos",
+          "wordId": "Gorgon"
         }
       ]
     }
