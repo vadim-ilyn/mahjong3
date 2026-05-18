@@ -270,13 +270,13 @@
   #toast.win { color: #bbf7d0; border-color: var(--ok); }
   #toast.lose { color: #fecaca; border-color: var(--bad); }
 
-  #endPopup {
+  #endPopup, #levelPopup {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.7);
     display: flex; align-items: center; justify-content: center;
     z-index: 100000;
   }
-  #endPopup[hidden] { display: none; }
+  #endPopup[hidden], #levelPopup[hidden] { display: none; }
   .popup-content {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -294,6 +294,36 @@
     font: inherit; font-size: 16px; font-weight: 600;
   }
   .popup-content button:hover { background: #0ea5e9; }
+  .popup-content button.ghost {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .popup-content button.ghost:hover { background: rgba(255,255,255,0.04); }
+
+  .level-list {
+    display: flex; flex-direction: column; gap: 8px;
+    margin: 0 0 18px;
+  }
+  .level-btn {
+    background: var(--accent); color: #0f172a; border: 0;
+    padding: 12px 16px; border-radius: 6px; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 600;
+    text-align: left;
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px;
+  }
+  .level-btn:hover { background: #0ea5e9; }
+  .level-btn .level-diff {
+    color: #0f172a; opacity: 0.7;
+    font-weight: 500; font-size: 13px;
+  }
+  .level-btn.current {
+    outline: 2px solid var(--ok); outline-offset: 2px;
+  }
+  .level-btn.current::after {
+    content: '· current'; color: var(--ok);
+    font-size: 12px; font-weight: 500;
+  }
 
   /* Mobile layout: smaller cells & tiles, stacked topbar, tighter padding,
      no oversized actions-col margin. */
@@ -383,6 +413,7 @@
       <div class="actions-col">
         <button id="shuffleBtn" title="Shuffle remaining board tiles (costs 1 move)">Shuffle</button>
         <button id="undoBtn" title="Undo the last move">Undo</button>
+        <button id="levelsBtn" title="Choose a level to play">Levels</button>
       </div>
       <div class="pile-col">
         <div id="wastePileWrap" class="pile-wrap"></div>
@@ -406,6 +437,14 @@
       <h2 id="popupTitle">Game over</h2>
       <p id="popupMessage"></p>
       <button id="popupRestart">Restart</button>
+    </div>
+  </div>
+
+  <div id="levelPopup" hidden>
+    <div class="popup-content">
+      <h2>Choose a level</h2>
+      <div id="levelList" class="level-list"></div>
+      <button id="levelPopupClose" class="ghost">Cancel</button>
     </div>
   </div>
 
@@ -1026,6 +1065,40 @@ function getNextLevelKey() {
   return LEVEL_SEQUENCE[i + 1];
 }
 
+const DIFFICULTY_LABELS = {
+  easy: 'Easy',
+  normal: 'Normal',
+  hard: 'Hard',
+  veryhard: 'Very hard',
+};
+
+function showLevelPopup() {
+  const list = el('levelList');
+  list.innerHTML = '';
+  const levels = window.MAHJONG_LEVELS || {};
+  for (const key of LEVEL_SEQUENCE) {
+    const data = levels[key];
+    const diff = (data && data.difficulty) || '';
+    const btn = document.createElement('button');
+    btn.className = 'level-btn';
+    if (key === currentLevelKey) btn.classList.add('current');
+    const name = document.createElement('span');
+    name.textContent = key;
+    const label = document.createElement('span');
+    label.className = 'level-diff';
+    label.textContent = DIFFICULTY_LABELS[diff] || diff;
+    btn.appendChild(name);
+    btn.appendChild(label);
+    btn.addEventListener('click', () => {
+      hideLevelPopup();
+      loadLevelByKey(key);
+    });
+    list.appendChild(btn);
+  }
+  el('levelPopup').hidden = false;
+}
+function hideLevelPopup() { el('levelPopup').hidden = true; }
+
 // True if any remaining tile (board, stock deck, or waste) could legally drop
 // into any slot under current state. Includes blocked board tiles because
 // they may become unblocked once tiles above them are collected.
@@ -1125,6 +1198,11 @@ el('shuffleBtn').addEventListener('click', () => {
   shuffleBoardTiles();
 });
 el('undoBtn').addEventListener('click', undo);
+el('levelsBtn').addEventListener('click', showLevelPopup);
+el('levelPopupClose').addEventListener('click', hideLevelPopup);
+el('levelPopup').addEventListener('click', (e) => {
+  if (e.target === el('levelPopup')) hideLevelPopup();
+});
 
 // Touch-drag state and global handlers. setupTileDrag wires touchstart on
 // each tile; movement and release have to be on document so the gesture
