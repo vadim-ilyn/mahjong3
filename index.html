@@ -409,9 +409,12 @@
     </div>
   </div>
 
-  <!-- Sidecar level for file:// (where fetch is blocked). HTTP loads still prefer
-       fetching levels/level-1.json directly so editor edits show up immediately. -->
+  <!-- Sidecar levels for file:// (where fetch is blocked). HTTP loads still prefer
+       fetching levels/level-N.json directly so editor edits show up immediately. -->
   <script src="levels/level-1.js"></script>
+  <script src="levels/level-2.js"></script>
+  <script src="levels/level-3.js"></script>
+  <script src="levels/level-4.js"></script>
 <script>
 'use strict';
 
@@ -426,7 +429,10 @@ const TILE_H = 6;
 
 const el = (id) => document.getElementById(id);
 
+const LEVEL_SEQUENCE = ['level-1', 'level-2', 'level-3', 'level-4'];
+
 let game = null;
+let currentLevelKey = null;
 
 function rectsOverlap(a, b) {
   return !(a.x + TILE_W <= b.x || b.x + TILE_W <= a.x ||
@@ -996,15 +1002,28 @@ function checkEndState() {
   const remaining = onBoard + game.stockDeck.length + game.wastePile.length;
   if (remaining === 0) {
     toast('All tiles collected — you win!', 'win');
+    const nextKey = getNextLevelKey();
+    if (nextKey) {
+      showEndPopup('Level complete!', 'Nicely done. Ready for ' + nextKey + '?', 'next');
+    } else {
+      showEndPopup('You finished the game!', 'All levels cleared. Play again from the start?', 'finale');
+    }
     return;
   }
   if (game.movesLeft <= 0) {
-    showEndPopup('Out of moves', 'You ran out of moves before clearing the board.');
+    showEndPopup('Out of moves', 'You ran out of moves before clearing the board.', 'restart');
     return;
   }
   if (!anyPlayableTile()) {
-    showEndPopup('No moves available', 'No tile can be placed in any slot — restart to shuffle.');
+    showEndPopup('No moves available', 'No tile can be placed in any slot — restart to shuffle.', 'restart');
   }
+}
+
+function getNextLevelKey() {
+  if (!currentLevelKey) return null;
+  const i = LEVEL_SEQUENCE.indexOf(currentLevelKey);
+  if (i < 0 || i >= LEVEL_SEQUENCE.length - 1) return null;
+  return LEVEL_SEQUENCE[i + 1];
 }
 
 // True if any remaining tile (board, stock deck, or waste) could legally drop
@@ -1023,9 +1042,16 @@ function anyPlayableTile() {
   return false;
 }
 
-function showEndPopup(title, message) {
+function showEndPopup(title, message, mode) {
+  mode = mode || 'restart';
   el('popupTitle').textContent = title;
   el('popupMessage').textContent = message;
+  const btn = el('popupRestart');
+  btn.dataset.mode = mode;
+  btn.textContent =
+    mode === 'next'   ? 'Next level' :
+    mode === 'finale' ? 'Play again' :
+                        'Restart';
   el('endPopup').hidden = false;
 }
 function hideEndPopup() { el('endPopup').hidden = true; }
@@ -1083,6 +1109,15 @@ el('resetBtn').addEventListener('click', () => {
   if (game && game.level) restartWithShuffle();
 });
 el('popupRestart').addEventListener('click', () => {
+  const mode = el('popupRestart').dataset.mode || 'restart';
+  if (mode === 'next') {
+    const nextKey = getNextLevelKey();
+    if (nextKey) { loadLevelByKey(nextKey); return; }
+  }
+  if (mode === 'finale') {
+    loadLevelByKey(LEVEL_SEQUENCE[0]);
+    return;
+  }
   if (game && game.level) restartWithShuffle();
 });
 el('shuffleBtn').addEventListener('click', () => {
@@ -1153,6 +1188,7 @@ el('loadJson').addEventListener('change', async (e) => {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
+    currentLevelKey = null;
     initGame(data);
   } catch (err) {
     toast('Failed to parse level: ' + err.message, 'lose');
@@ -1161,25 +1197,41 @@ el('loadJson').addEventListener('change', async (e) => {
   }
 });
 
-async function loadDefault() {
+async function loadLevelByKey(key) {
   if (location.protocol !== 'file:') {
     try {
-      const resp = await fetch('levels/level-1.json', { cache: 'no-store' });
-      if (resp.ok) { initGame(await resp.json()); return; }
-    } catch (_) { /* fall through */ }
+      const resp = await fetch('levels/' + key + '.json', { cache: 'no-store' });
+      if (resp.ok) {
+        currentLevelKey = key;
+        initGame(await resp.json());
+        return true;
+      }
+    } catch (_) { /* fall through to sidecar */ }
   }
   const levels = window.MAHJONG_LEVELS || {};
-  const keys = Object.keys(levels);
-  const preferred = ['level-1', 'level_1'].find(k => k in levels) || keys[0];
-  if (preferred) {
-    initGame(levels[preferred]);
-  } else {
-    document.body.innerHTML =
-      '<div style="padding:20px;color:#f87171;font-family:system-ui">' +
-      'No level data found. Make sure <code>levels/level-1.js</code> ' +
-      '(for file://) or <code>levels/level-1.json</code> (over HTTP) is reachable.' +
-      '</div>';
+  if (levels[key]) {
+    currentLevelKey = key;
+    initGame(levels[key]);
+    return true;
   }
+  return false;
+}
+
+async function loadDefault() {
+  if (await loadLevelByKey(LEVEL_SEQUENCE[0])) return;
+  // Last-ditch: pick any sidecar level we can find.
+  const levels = window.MAHJONG_LEVELS || {};
+  const keys = Object.keys(levels);
+  if (keys.length) {
+    currentLevelKey = keys[0];
+    initGame(levels[keys[0]]);
+    return;
+  }
+  document.body.innerHTML =
+    '<div style="padding:20px;color:#f87171;font-family:system-ui">' +
+    'No level data found. Make sure <code>levels/level-1.js</code> ' +
+    '(for file://) or <code>levels/level-1.json</code> (over HTTP) is reachable.' +
+    '</div>';
 }
 
 loadDefault();

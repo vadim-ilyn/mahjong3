@@ -2,8 +2,8 @@
 // Regenerated whenever you press "Download JSON + JS".
 (function () {
   if (!window.MAHJONG_LEVELS) window.MAHJONG_LEVELS = {};
-  window.MAHJONG_LEVELS["level-1"] = {
-  "levelId": "level-1",
+  window.MAHJONG_LEVELS["level-2"] = {
+  "levelId": "level-2",
   "slotsAmount": 7,
   "movesCount": 150,
   "difficulty": "normal",
