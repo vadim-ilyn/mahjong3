@@ -6,9 +6,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { discoverLevelKeys, buildBundle } = require('./build-manifest');
 
 const LEVELS_DIR = path.join(__dirname, '..', 'levels');
-const LEVEL_KEYS = ['level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'];
+const LEVEL_KEYS = discoverLevelKeys();
 
 function buildPairsByCategory(categoriesData) {
   const map = new Map();
@@ -191,3 +192,4 @@ function regenerateLevel(key) {
 }
 
 for (const key of LEVEL_KEYS) regenerateLevel(key);
+buildBundle();
