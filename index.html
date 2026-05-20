@@ -395,7 +395,7 @@
 </style>
 </head>
 <body>
-  <header class="topbar" hidden>
+  <header class="topbar">
     <div class="meta" id="levelMeta"></div>
     <div class="topbar-right">
       <label for="loadJson" title="Load a different level JSON">Load level…</label>
@@ -455,6 +455,7 @@
   <script src="levels/level-3.js"></script>
   <script src="levels/level-4.js"></script>
   <script src="levels/level-5.js"></script>
+  <script src="levels/level-6.js"></script>
 <script>
 'use strict';
 
@@ -469,7 +470,7 @@ const TILE_H = 6;
 
 const el = (id) => document.getElementById(id);
 
-const LEVEL_SEQUENCE = ['level-1', 'level-2', 'level-3', 'level-4', 'level-5'];
+const LEVEL_SEQUENCE = ['level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'];
 
 let game = null;
 let currentLevelKey = null;

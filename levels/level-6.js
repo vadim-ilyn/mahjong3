@@ -1,9 +1,9 @@
-// Auto-generated alongside level-1.json by editor.html.
+// Auto-generated alongside level-6.json by editor.html.
 // Regenerated whenever you press "Download JSON + JS".
 (function () {
   if (!window.MAHJONG_LEVELS) window.MAHJONG_LEVELS = {};
-  window.MAHJONG_LEVELS["level-1"] = {
-  "levelId": "level-1",
+  window.MAHJONG_LEVELS["level-6"] = {
+  "levelId": "level-6",
   "slotsAmount": 5,
   "movesCount": 100,
   "difficulty": "veryhard",
