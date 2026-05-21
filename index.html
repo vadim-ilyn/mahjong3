@@ -1240,6 +1240,10 @@ function undo() {
 }
 
 function checkEndState() {
+  // During a walkthrough, intermediate flips can briefly create unwinnable
+  // signals (no moves left mid-stock-navigation, etc). Suppress popups and let
+  // the walk finish — we re-check from scratch in closeWalk.
+  if (walkState) return;
   const onBoard = game.boardTiles.filter(t => !t.collected).length;
   const remaining = onBoard + game.stockDeck.length + game.wastePile.length;
   if (remaining === 0) {
@@ -1490,6 +1494,51 @@ function showSolverPopup(opts) {
 
 function hideSolverPopup() { el('solverPopup').hidden = true; }
 
+// Build a level definition + tile-reference maps from the current game state.
+// The virtual level only contains tiles still in play (uncollected board tiles,
+// stock deck, waste pile); slots that have a category tile become initialSlots
+// for the solver. Stock order is wastePile (oldest..top) then stockDeck so the
+// solver's stock indices match the natural cycle order from the current state.
+function buildVirtualLevelFromGame() {
+  const stageMap = new Map();
+  const boardTileMap = [];
+  for (const t of game.boardTiles) {
+    if (t.collected) continue;
+    if (!stageMap.has(t.z)) stageMap.set(t.z, []);
+    stageMap.get(t.z).push(t);
+  }
+  const zs = Array.from(stageMap.keys()).sort((a, b) => a - b);
+  const stages = zs.map((z, i) => {
+    const tiles = stageMap.get(z).map(t => {
+      boardTileMap.push(t);
+      return { x: t.x, y: t.y, categoryId: t.categoryId, wordId: t.wordId };
+    });
+    return { stageId: 'stage-' + (i + 1), z, tiles };
+  });
+
+  const stockTileMap = [];
+  const stock = [];
+  for (const t of game.wastePile) { stock.push(t.wordId); stockTileMap.push(t); }
+  for (const t of game.stockDeck) { stock.push(t.wordId); stockTileMap.push(t); }
+
+  const initialSlots = game.slots.map(s =>
+    s.categoryTile ? { catId: s.categoryTile.categoryId } : null
+  );
+  const initialWasteCount = game.wastePile.length;
+
+  const level = {
+    levelId: game.level.levelId,
+    slotsAmount: game.slots.length,
+    movesCount: game.movesLeft,
+    difficulty: game.level.difficulty,
+    categories: game.level.categories || [],
+    grid: game.level.grid,
+    stock,
+    stages,
+  };
+  return { level, boardTileMap, stockTileMap, initialSlots, initialWasteCount };
+}
+
 function runSolver() {
   if (!game || !game.level) return;
   if (!window.MahjongSolver) {
@@ -1501,38 +1550,74 @@ function runSolver() {
   // multi-second) solver call blocks the main thread.
   setTimeout(() => {
     let result;
+    let maps = null;
     try {
-      result = window.MahjongSolver.solveLevel(game.level);
+      const vl = buildVirtualLevelFromGame();
+      maps = { boardTileMap: vl.boardTileMap, stockTileMap: vl.stockTileMap };
+      result = window.MahjongSolver.solveLevel(vl.level, {
+        initialSlots: vl.initialSlots,
+        initialWasteCount: vl.initialWasteCount,
+      });
     } catch (err) {
       result = { error: err && err.message ? err.message : String(err) };
     }
-    lastSolverResult = result.error ? null : result;
+    if (result.error) {
+      lastSolverResult = null;
+    } else {
+      result._maps = maps;
+      lastSolverResult = result;
+    }
     showSolverPopup({ result });
     if (game) renderHeader();
   }, 50);
 }
 
 // Solution walkthrough. The solver records one winning ordering as
-// result.sampleSolution — a list of { src: 'board'|'stock', idx, catId, wordId }.
-// To replay it we reset the level (so solver indexes match current tiles), then
-// apply each step via the normal applyDrop pipeline so undo / render work.
-// initialStock snapshots the stockDeck at walk-start so step.idx (which points
-// into the original level.stock order) still resolves after shifts/removes.
+// result.sampleSolution — a list of { src: 'board'|'stock', idx, catId, wordId }
+// indexing into the virtual level it was given. result._maps maps those indices
+// back to live game tile references, so the walk works against the CURRENT
+// state — no level reset needed. Stock plays drive the actual cycle (flips and
+// recycles via flipFromStock) so the move cost matches real gameplay.
 
-function startWalk(steps) {
+function startWalk(steps, maps) {
   if (!steps || steps.length === 0) {
     toast('No sample solution available', 'lose');
     return;
   }
-  closeWalk();
-  initGame(game.level);
-  if (game.movesLeft < steps.length + 1) {
-    game.movesLeft = steps.length + 1;
+  if (!maps) {
+    toast('Walk needs a fresh Solve — please run Solve again', 'lose');
+    return;
   }
+  for (const step of steps) {
+    const tile = step.src === 'board'
+      ? maps.boardTileMap[step.idx]
+      : maps.stockTileMap[step.idx];
+    if (!tile) {
+      toast('Solver result is stale — please run Solve again', 'lose');
+      return;
+    }
+    if (step.src === 'board' && tile.collected) {
+      toast('Solver result is stale — please run Solve again', 'lose');
+      return;
+    }
+    if (step.src === 'stock' &&
+        game.stockDeck.indexOf(tile) < 0 &&
+        game.wastePile.indexOf(tile) < 0) {
+      toast('Solver result is stale — please run Solve again', 'lose');
+      return;
+    }
+    if (tile.categoryId !== step.catId || tile.wordId !== step.wordId) {
+      toast('Tiles changed since Solve — please run Solve again', 'lose');
+      return;
+    }
+  }
+  closeWalk();
   walkState = {
     steps,
     idx: 0,
-    initialStock: game.stockDeck.slice(),
+    boardTileMap: maps.boardTileMap,
+    stockTileMap: maps.stockTileMap,
+    stepMoveCounts: [],
     autoTimer: null,
   };
   el('walkPanel').hidden = false;
@@ -1541,23 +1626,25 @@ function startWalk(steps) {
 }
 
 function closeWalk() {
+  const wasWalking = walkState !== null;
   if (walkState && walkState.autoTimer) {
     clearInterval(walkState.autoTimer);
   }
   walkState = null;
   const panel = el('walkPanel');
   if (panel) panel.hidden = true;
+  if (wasWalking && game) checkEndState();
 }
 
 function resolveStepTile(step) {
   if (!walkState) return null;
   if (step.src === 'board') {
-    return game.boardTiles[step.idx] || null;
+    return walkState.boardTileMap[step.idx] || null;
   }
-  const original = walkState.initialStock[step.idx];
-  if (!original) return null;
-  if (game.stockDeck.indexOf(original) >= 0) return original;
-  if (game.wastePile.indexOf(original) >= 0) return original;
+  const target = walkState.stockTileMap[step.idx];
+  if (!target) return null;
+  if (game.stockDeck.indexOf(target) >= 0) return target;
+  if (game.wastePile.indexOf(target) >= 0) return target;
   return null;
 }
 
@@ -1577,32 +1664,93 @@ function getNextWalkSlotIdx() {
   return -1;
 }
 
+// Predict how many real moves the next step will take. Mirrors the cycle model
+// the solver uses for actualMoves: 1 for board drops, drag-only for waste-top
+// stock tiles, flips for face-down stock, flush+recycle+flip for buried waste.
+function estimateStepMoves(step) {
+  if (!step) return 0;
+  if (step.src === 'board') return 1;
+  const target = walkState && walkState.stockTileMap[step.idx];
+  if (!target) return 0;
+  const cycle = game.wastePile.concat(game.stockDeck);
+  const top = game.wastePile.length - 1;
+  const pos = cycle.indexOf(target);
+  if (pos < 0) return 0;
+  if (pos === top) return 1;
+  if (pos > top) return (pos - top) + 1;
+  const flush = cycle.length - 1 - top;
+  return flush + 1 + (pos + 1) + 1;
+}
+
 function walkNext() {
   if (!walkState || walkState.idx >= walkState.steps.length) return false;
   const step = walkState.steps[walkState.idx];
-  const tile = resolveStepTile(step);
-  if (!tile || (tile.loc === 'board' && tile.collected)) {
-    toast('Step ' + (walkState.idx + 1) + ' could not resolve a tile', 'lose');
-    stopAutoPlay();
-    return false;
-  }
-  for (let i = 0; i < game.slots.length; i++) {
-    if (canAcceptDrop(i, tile)) {
-      applyDrop(i, tile);
-      walkState.idx++;
-      updateWalkPanel();
-      return true;
+  const histLenBefore = game.history.length;
+
+  if (step.src === 'board') {
+    const tile = walkState.boardTileMap[step.idx];
+    if (!tile || tile.collected) {
+      toast('Step ' + (walkState.idx + 1) + ' could not resolve a tile', 'lose');
+      stopAutoPlay();
+      return false;
+    }
+    let placed = false;
+    for (let i = 0; i < game.slots.length; i++) {
+      if (canAcceptDrop(i, tile)) { applyDrop(i, tile); placed = true; break; }
+    }
+    if (!placed) {
+      toast('Step ' + (walkState.idx + 1) + ' has no compatible slot', 'lose');
+      stopAutoPlay();
+      return false;
+    }
+  } else {
+    const target = walkState.stockTileMap[step.idx];
+    if (!target) {
+      toast('Step ' + (walkState.idx + 1) + ' could not resolve a stock tile', 'lose');
+      stopAutoPlay();
+      return false;
+    }
+    let safety = (game.stockDeck.length + game.wastePile.length) * 3 + 10;
+    while (safety-- > 0) {
+      const w = game.wastePile.length;
+      if (w > 0 && game.wastePile[w - 1] === target) break;
+      if (game.stockDeck.length === 0 && game.wastePile.length === 0) break;
+      flipFromStock();
+    }
+    const wEnd = game.wastePile.length - 1;
+    if (wEnd < 0 || game.wastePile[wEnd] !== target) {
+      toast('Step ' + (walkState.idx + 1) + ' could not expose stock tile', 'lose');
+      stopAutoPlay();
+      return false;
+    }
+    let placed = false;
+    for (let i = 0; i < game.slots.length; i++) {
+      if (canAcceptDrop(i, target)) { applyDrop(i, target); placed = true; break; }
+    }
+    if (!placed) {
+      toast('Step ' + (walkState.idx + 1) + ' has no compatible slot', 'lose');
+      stopAutoPlay();
+      return false;
     }
   }
-  toast('Step ' + (walkState.idx + 1) + ' has no compatible slot', 'lose');
-  stopAutoPlay();
-  return false;
+
+  walkState.stepMoveCounts.push(game.history.length - histLenBefore);
+  walkState.idx++;
+  if (walkState.idx >= walkState.steps.length) {
+    stopAutoPlay();
+    toast('Solution walkthrough complete', 'win');
+  }
+  updateWalkPanel();
+  return true;
 }
 
 function walkPrev() {
   if (!walkState || walkState.idx === 0) return;
-  if (game.history.length === 0) return;
-  undo();
+  const moveCount = walkState.stepMoveCounts.pop() || 1;
+  for (let i = 0; i < moveCount; i++) {
+    if (game.history.length === 0) break;
+    undo();
+  }
   walkState.idx--;
   updateWalkPanel();
 }
@@ -1610,9 +1758,8 @@ function walkPrev() {
 function walkReset() {
   if (!walkState) return;
   stopAutoPlay();
-  while (walkState.idx > 0 && game.history.length > 0) {
-    undo();
-    walkState.idx--;
+  while (walkState.idx > 0 && walkState.stepMoveCounts.length > 0) {
+    walkPrev();
   }
   updateWalkPanel();
 }
@@ -1649,7 +1796,9 @@ function updateWalkPanel() {
   } else {
     const next = walkState.steps[idx];
     const role = next.wordId === next.catId ? 'category ' : '';
-    desc.textContent = 'Next: place ' + role + '"' + next.wordId + '" (' + next.catId + ') from ' + next.src + '.';
+    const cost = estimateStepMoves(next);
+    const costTag = cost > 1 ? ' — costs ' + cost + ' moves' : '';
+    desc.textContent = 'Next: place ' + role + '"' + next.wordId + '" (' + next.catId + ') from ' + next.src + costTag + '.';
   }
   el('walkPrevBtn').disabled = idx === 0;
   el('walkNextBtn').disabled = idx >= total;
@@ -1675,9 +1824,10 @@ el('walkPlayBtn').addEventListener('click', () => {
 el('walkCloseBtn').addEventListener('click', closeWalk);
 
 el('solverWalkBtn').addEventListener('click', () => {
-  const steps = lastSolverResult && lastSolverResult.sampleSolution;
+  const r = lastSolverResult;
+  if (!r) return;
   hideSolverPopup();
-  startWalk(steps);
+  startWalk(r.sampleSolution, r._maps);
 });
 
 el('resetBtn').addEventListener('click', () => {

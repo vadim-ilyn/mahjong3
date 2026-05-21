@@ -211,9 +211,24 @@
       return total;
     }
 
+    // Seed slot state from opts.initialSlots so the solver can pick up
+    // mid-game. Each filled slot starts at count=0 in the virtual level
+    // because totalsPerCat is derived from un-played tiles only, so a slot
+    // auto-clears once the remaining word tiles for its category are dropped.
     const initSlots = new Array(data.numSlots).fill(null);
+    if (Array.isArray(opts.initialSlots)) {
+      for (let i = 0; i < data.numSlots; i++) {
+        const s = opts.initialSlots[i];
+        if (s && s.catId) initSlots[i] = { catId: s.catId, count: 0 };
+      }
+    }
+    const initialWasteCount = Math.max(0, Math.min(M, (opts.initialWasteCount | 0)));
     const numWays = ways(0n, allStock, initSlots, []);
     const timeMs = Date.now() - startTime;
+
+    const actualMoves = foundOneSolution
+      ? simulateMovesCost(foundOneSolution, M, initialWasteCount)
+      : null;
 
     return {
       numWays,
@@ -227,7 +242,46 @@
       stockTilesCount: M,
       sampleSolution: foundOneSolution,
       movesBudget: level.movesCount | 0,
+      initialWasteCount,
+      actualMoves,
     };
+  }
+
+  // Replay a sample solution against the stock cycle model to count the real
+  // moves required (flip/drag/recycle, not just one drop per stock tile).
+  // The cycle is the list of stock indices 0..M-1 in level.stock order; initial
+  // waste = first initialWasteCount of them, top = index initialWasteCount-1.
+  // For each stock play, navigate from the current waste-top to the target:
+  //   - if target on top:        1 drag.
+  //   - if target in face-down stock: flip until exposed, drag.
+  //   - if target buried in waste:   flush remaining stock, recycle, flip,
+  //                                  drag. (Worst case; the solver enumerates
+  //                                  alternative orderings to avoid this.)
+  function simulateMovesCost(path, M, initialWasteCount) {
+    const unplayed = [];
+    for (let i = 0; i < M; i++) unplayed.push(i);
+    let wasteEnd = Math.max(-1, Math.min(M - 1, initialWasteCount - 1));
+    let moves = 0;
+    for (const step of path) {
+      if (step.src === 'board') { moves += 1; continue; }
+      const cyclePos = unplayed.indexOf(step.idx);
+      if (cyclePos < 0) continue;
+      if (cyclePos === wasteEnd) {
+        moves += 1;
+        unplayed.splice(cyclePos, 1);
+        wasteEnd -= 1;
+      } else if (cyclePos > wasteEnd) {
+        moves += (cyclePos - wasteEnd) + 1;
+        unplayed.splice(cyclePos, 1);
+        wasteEnd = cyclePos - 1;
+      } else {
+        const flushFlips = (unplayed.length - 1) - wasteEnd;
+        moves += flushFlips + 1 + (cyclePos + 1) + 1;
+        unplayed.splice(cyclePos, 1);
+        wasteEnd = cyclePos - 1;
+      }
+    }
+    return moves;
   }
 
   // Difficulty label is a rough heuristic. Fewer ways => harder. A capped
@@ -259,11 +313,11 @@
     return result.capped ? '≥ ' + base : base;
   }
 
-  // Minimum moves estimate: every tile takes 1 move to drop, plus one flip per
-  // stock tile (best-case: drop stock tiles in deck order, one flip exposes one
-  // tile). Ignores recycles, which would only be needed if optimal ordering
-  // forces out-of-deck-order stock plays.
+  // When the solver has a sample solution, report the moves it actually needs
+  // (board drops + accurate stock cycle navigation: flips, drags, recycles).
+  // Falls back to the naive board + 2*stock estimate when no sample is available.
   function minMovesEstimate(result) {
+    if (result && typeof result.actualMoves === 'number') return result.actualMoves;
     return result.boardTilesCount + 2 * result.stockTilesCount;
   }
 
@@ -274,6 +328,7 @@
       formatWays,
       formatBigInt,
       minMovesEstimate,
+      simulateMovesCost,
     };
   }
 })();
