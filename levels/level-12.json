@@ -1,6 +1,6 @@
 {
   "levelId": "level-1",
-  "slotsAmount": 4,
+  "slotsAmount": 2,
   "movesCount": 200,
   "difficulty": "veryhard",
   "stock": [
